@@ -24,6 +24,19 @@
 - **Error handling**: `RustError` exception type with `result_to_exception`
 - **Function registration**: Register and cache compiled Rust functions
 
+### Phase 3: External Library Integration ✅
+- **Cargo support**: Automatically download and build external crates
+- **Dependency parsing**: Support for `//! ```cargo ... ``` ` and `// cargo-deps:` formats
+- **Cached builds**: Intelligent caching of Cargo projects to minimize rebuild times
+- **Crate integration**: Easily use popular crates like `ndarray`, `serde`, `rand`, etc.
+
+### Phase 4: Rust Structs as Julia Objects ✅
+- **Automatic mapping**: Detect `pub struct` and `pub fn` to generate Julia wrappers
+- **C-FFI generation**: Automatically create "extern C" wrappers for Rust methods
+- **Dynamic Julia types**: Generate `mutable struct` in Julia at macro expansion time
+- **Automatic memory management**: Integrated `finalizer` that calls Rust's `Drop` implementation
+- **Managed lifecycle**: Seamlessly use Rust objects as first-class citizens in Julia
+
 ## Installation
 
 ```julia

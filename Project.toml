@@ -10,6 +10,7 @@ LLVM = "929cbde3-209d-540e-8aea-75f648917ca0"
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 RustToolChain = "e9dc52e2-edb8-4742-9783-5e542d30dbb5"
 SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
+TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
 [compat]
 BenchmarkTools = "1.6.3"

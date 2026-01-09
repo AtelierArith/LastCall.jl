@@ -2,7 +2,7 @@
 
 julia_version = "1.12.4"
 manifest_format = "2.0"
-project_hash = "0de9d2e9cfe615ec179f0575ff855f3169927d33"
+project_hash = "a8210f0767779d2f7c7ab185bfc34aa11e214ba7"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -98,7 +98,7 @@ uuid = "dad2f222-ce93-54a1-a47d-0025e8a3acab"
 version = "0.0.38+0"
 
 [[deps.LastCall]]
-deps = ["BenchmarkTools", "Dates", "LLVM", "Libdl", "SHA"]
+deps = ["BenchmarkTools", "Dates", "LLVM", "Libdl", "RustToolChain", "SHA", "TOML"]
 path = "."
 uuid = "84591b13-8127-4a16-8156-1f71d7525150"
 version = "0.1.0"
