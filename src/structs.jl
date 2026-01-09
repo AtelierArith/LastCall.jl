@@ -702,10 +702,16 @@ function emit_julia_definitions(info::RustStructInfo)
         
         # Single Base.getproperty for all fields and methods
         method_names = Set([Symbol(m.name) for m in info.methods])
+        method_name_to_func = Dict{Symbol, Symbol}()
+        for m in info.methods
+            method_name_to_func[Symbol(m.name)] = esc(Symbol(m.name))
+        end
+        
         push!(exprs, quote
             function Base.getproperty(self::$esc_struct, field::Symbol)
                 field_info = $(QuoteNode(field_getters))
                 method_names_set = $(QuoteNode(method_names))
+                method_funcs = $(QuoteNode(method_name_to_func))
                 
                 # Check if it's a field
                 if haskey(field_info, field)
@@ -716,8 +722,11 @@ function emit_julia_definitions(info::RustStructInfo)
                     return call_rust_function(func_ptr, field_type, self.ptr)
                 # Check if it's a method
                 elseif field in method_names_set
-                    # Return the method directly - Julia will handle p.method() syntax
-                    return getfield(self, field)
+                    # Return a function that calls the method with self as first argument
+                    method_func = method_funcs[field]
+                    return function(inner_args...)
+                        return method_func(self, inner_args...)
+                    end
                 else
                     return getfield(self, field)
                 end
