@@ -240,7 +240,14 @@ The following registries are not exported but are available for advanced usage:
 
 ```@autodocs
 Modules = [LastCall]
-Filter = t -> t in [RUST_LIBRARIES, RUST_MODULE_REGISTRY, FUNCTION_REGISTRY, IRUST_FUNCTIONS]
+Filter = t -> begin
+    name = try
+        nameof(t)
+    catch
+        return false
+    end
+    return name in [:RUST_LIBRARIES, :RUST_MODULE_REGISTRY, :FUNCTION_REGISTRY, :IRUST_FUNCTIONS]
+end
 ```
 
 ## Utility Functions
