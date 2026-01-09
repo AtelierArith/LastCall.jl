@@ -536,4 +536,4 @@ rust"""
 
 ## Summary
 
-These examples demonstrate practical usage of LastCall.jl. For more detailed information, see the [Tutorial](tutorial.md) and [API Reference](api.md).
+These examples demonstrate practical usage of LastCall.jl. For more detailed information, see the [Tutorial](@ref "tutorial.md") and [API Reference](@ref "api.md").
