@@ -573,15 +573,14 @@ function drop_rust_vec(vec::RustVec{T}) where {T}
         fn_ptr = Libdl.dlsym(lib, :rust_vec_drop_i32)
         ccall(fn_ptr, Cvoid, (CRustVec,), cvec)
     elseif T == Int64
-        # Note: rust_vec_drop_i64 is not yet implemented in Rust helpers
-        # For now, we'll just mark as dropped
-        @warn "rust_vec_drop_i64 not yet implemented, just marking as dropped"
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_drop_i64)
+        ccall(fn_ptr, Cvoid, (CRustVec,), cvec)
     elseif T == Float32
-        # Note: rust_vec_drop_f32 is not yet implemented in Rust helpers
-        @warn "rust_vec_drop_f32 not yet implemented, just marking as dropped"
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_drop_f32)
+        ccall(fn_ptr, Cvoid, (CRustVec,), cvec)
     elseif T == Float64
-        # Note: rust_vec_drop_f64 is not yet implemented in Rust helpers
-        @warn "rust_vec_drop_f64 not yet implemented, just marking as dropped"
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_drop_f64)
+        ccall(fn_ptr, Cvoid, (CRustVec,), cvec)
     else
         error("Unsupported type for RustVec drop: $T. Supported types: Int32, Int64, Float32, Float64")
     end
@@ -594,4 +593,336 @@ end
 # Override drop! for RustVec
 function drop!(vec::RustVec{T}) where {T}
     drop_rust_vec(vec)
+end
+
+# ============================================================================
+# RustVec creation from Julia arrays
+# ============================================================================
+
+"""
+    create_rust_vec(v::Vector{T}) -> RustVec{T}
+
+Create a `RustVec` from a Julia `Vector` by copying data to Rust-managed memory.
+
+# Arguments
+- `v::Vector{T}`: A Julia Vector to convert. Supported types: `Int32`, `Int64`, `Float32`, `Float64`
+
+# Returns
+- `RustVec{T}`: A new RustVec containing a copy of the data
+
+# Throws
+- `ErrorException`: If the Rust helpers library is not loaded
+- `ErrorException`: If the element type is not supported
+
+# Example
+```julia
+julia_vec = Int32[1, 2, 3, 4, 5]
+rust_vec = create_rust_vec(julia_vec)
+@assert length(rust_vec) == 5
+drop!(rust_vec)  # Clean up when done
+```
+
+# Note
+The data is copied to Rust-managed memory. The original Julia array is not modified.
+Remember to call `drop!(rust_vec)` when done to free Rust memory.
+
+See also: [`to_julia_vector`](@ref), [`drop!`](@ref)
+"""
+function create_rust_vec(v::Vector{T}) where T
+    if !is_rust_helpers_available()
+        error("Rust helpers library not loaded. Cannot create RustVec. Please compile deps/rust_helpers.")
+    end
+
+    lib = get_rust_helpers_lib()
+    data_ptr = pointer(v)
+    len = length(v)
+
+    if T == Int32
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_new_from_array_i32)
+        cvec = ccall(fn_ptr, CRustVec, (Ptr{Int32}, UInt), data_ptr, len)
+    elseif T == Int64
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_new_from_array_i64)
+        cvec = ccall(fn_ptr, CRustVec, (Ptr{Int64}, UInt), data_ptr, len)
+    elseif T == Float32
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_new_from_array_f32)
+        cvec = ccall(fn_ptr, CRustVec, (Ptr{Float32}, UInt), data_ptr, len)
+    elseif T == Float64
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_new_from_array_f64)
+        cvec = ccall(fn_ptr, CRustVec, (Ptr{Float64}, UInt), data_ptr, len)
+    else
+        error("Unsupported type for RustVec: $T. Supported types: Int32, Int64, Float32, Float64")
+    end
+
+    return RustVec{T}(cvec.ptr, UInt(cvec.len), UInt(cvec.cap))
+end
+
+# ============================================================================
+# RustVec element access via Rust FFI
+# ============================================================================
+
+"""
+    rust_vec_get(vec::RustVec{T}, index::Integer) -> T
+
+Get an element from `RustVec` using Rust FFI with **0-based indexing**.
+
+# Arguments
+- `vec::RustVec{T}`: The RustVec to access
+- `index::Integer`: 0-based index of the element to retrieve
+
+# Returns
+- `T`: The element at the specified index
+
+# Throws
+- `ErrorException`: If the vec has been dropped
+- `BoundsError`: If index is out of bounds
+- `ErrorException`: If the Rust helpers library is not loaded
+
+# Example
+```julia
+rust_vec = create_rust_vec(Int32[10, 20, 30])
+value = rust_vec_get(rust_vec, 0)  # Returns 10
+value = rust_vec_get(rust_vec, 2)  # Returns 30
+drop!(rust_vec)
+```
+
+# Note
+This function uses **0-based indexing** to match Rust's convention.
+For 1-based indexing, use `vec[i]` syntax instead.
+
+See also: [`rust_vec_set!`](@ref), `getindex`
+"""
+function rust_vec_get(vec::RustVec{T}, index::Integer) where T
+    if vec.dropped || vec.ptr == C_NULL
+        error("Cannot access a dropped RustVec")
+    end
+    if index < 0 || index >= vec.len
+        throw(BoundsError(vec, index + 1))  # Convert to 1-indexed for error
+    end
+
+    if !is_rust_helpers_available()
+        error("Rust helpers library not loaded")
+    end
+
+    lib = get_rust_helpers_lib()
+    cvec = CRustVec(vec.ptr, vec.len, vec.cap)
+
+    if T == Int32
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_get_i32)
+        return ccall(fn_ptr, Int32, (CRustVec, UInt), cvec, index)
+    elseif T == Int64
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_get_i64)
+        return ccall(fn_ptr, Int64, (CRustVec, UInt), cvec, index)
+    elseif T == Float32
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_get_f32)
+        return ccall(fn_ptr, Float32, (CRustVec, UInt), cvec, index)
+    elseif T == Float64
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_get_f64)
+        return ccall(fn_ptr, Float64, (CRustVec, UInt), cvec, index)
+    else
+        error("Unsupported type for RustVec get: $T")
+    end
+end
+
+"""
+    rust_vec_set!(vec::RustVec{T}, index::Integer, value::T) -> Bool
+
+Set an element in RustVec using Rust FFI (0-indexed).
+Returns true if successful.
+"""
+function rust_vec_set!(vec::RustVec{T}, index::Integer, value::T) where T
+    if vec.dropped || vec.ptr == C_NULL
+        error("Cannot modify a dropped RustVec")
+    end
+    if index < 0 || index >= vec.len
+        throw(BoundsError(vec, index + 1))
+    end
+
+    if !is_rust_helpers_available()
+        error("Rust helpers library not loaded")
+    end
+
+    lib = get_rust_helpers_lib()
+    cvec = CRustVec(vec.ptr, vec.len, vec.cap)
+
+    if T == Int32
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_set_i32)
+        return ccall(fn_ptr, Bool, (CRustVec, UInt, Int32), cvec, index, value)
+    elseif T == Int64
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_set_i64)
+        return ccall(fn_ptr, Bool, (CRustVec, UInt, Int64), cvec, index, value)
+    elseif T == Float32
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_set_f32)
+        return ccall(fn_ptr, Bool, (CRustVec, UInt, Float32), cvec, index, value)
+    elseif T == Float64
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_set_f64)
+        return ccall(fn_ptr, Bool, (CRustVec, UInt, Float64), cvec, index, value)
+    else
+        error("Unsupported type for RustVec set: $T")
+    end
+end
+
+# ============================================================================
+# RustVec push operations
+# ============================================================================
+
+"""
+    push!(vec::RustVec{T}, value::T) -> RustVec{T}
+
+Push a value to RustVec. Note: This modifies the vec in place by updating
+its internal pointer, length, and capacity.
+"""
+function Base.push!(vec::RustVec{T}, value::T) where T
+    if vec.dropped
+        error("Cannot push to a dropped RustVec")
+    end
+
+    if !is_rust_helpers_available()
+        error("Rust helpers library not loaded")
+    end
+
+    lib = get_rust_helpers_lib()
+    cvec = CRustVec(vec.ptr, vec.len, vec.cap)
+
+    if T == Int32
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_push_i32)
+        new_cvec = ccall(fn_ptr, CRustVec, (CRustVec, Int32), cvec, value)
+    elseif T == Int64
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_push_i64)
+        new_cvec = ccall(fn_ptr, CRustVec, (CRustVec, Int64), cvec, value)
+    elseif T == Float32
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_push_f32)
+        new_cvec = ccall(fn_ptr, CRustVec, (CRustVec, Float32), cvec, value)
+    elseif T == Float64
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_push_f64)
+        new_cvec = ccall(fn_ptr, CRustVec, (CRustVec, Float64), cvec, value)
+    else
+        error("Unsupported type for RustVec push: $T")
+    end
+
+    # Update vec in place
+    vec.ptr = new_cvec.ptr
+    vec.len = UInt(new_cvec.len)
+    vec.cap = UInt(new_cvec.cap)
+
+    return vec
+end
+
+# ============================================================================
+# RustVec copy to Julia array
+# ============================================================================
+
+"""
+    copy_to_julia!(vec::RustVec{T}, dest::Vector{T}) -> Int
+
+Copy `RustVec` contents to a pre-allocated Julia `Vector` using efficient Rust FFI.
+
+This is the most efficient way to transfer data from Rust to Julia when you already
+have a destination buffer allocated.
+
+# Arguments
+- `vec::RustVec{T}`: Source RustVec to copy from
+- `dest::Vector{T}`: Pre-allocated destination Julia Vector
+
+# Returns
+- `Int`: Number of elements actually copied (min of source and dest lengths)
+
+# Throws
+- `ErrorException`: If the vec has been dropped
+- `ErrorException`: If the Rust helpers library is not loaded
+
+# Example
+```julia
+rust_vec = create_rust_vec(Int32[1, 2, 3, 4, 5])
+
+# Copy all elements
+dest = Vector{Int32}(undef, 5)
+n = copy_to_julia!(rust_vec, dest)
+@assert n == 5 && dest == Int32[1, 2, 3, 4, 5]
+
+# Copy to smaller buffer (partial copy)
+small_dest = Vector{Int32}(undef, 3)
+n = copy_to_julia!(rust_vec, small_dest)
+@assert n == 3 && small_dest == Int32[1, 2, 3]
+
+drop!(rust_vec)
+```
+
+# Performance
+This function uses a single FFI call to copy all data, making it much more
+efficient than element-by-element access for large vectors.
+
+See also: [`to_julia_vector`](@ref), [`create_rust_vec`](@ref)
+"""
+function copy_to_julia!(vec::RustVec{T}, dest::Vector{T}) where T
+    if vec.dropped || vec.ptr == C_NULL
+        error("Cannot copy from a dropped RustVec")
+    end
+
+    if !is_rust_helpers_available()
+        error("Rust helpers library not loaded")
+    end
+
+    lib = get_rust_helpers_lib()
+    cvec = CRustVec(vec.ptr, vec.len, vec.cap)
+    dest_ptr = pointer(dest)
+    dest_len = length(dest)
+
+    if T == Int32
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_copy_to_array_i32)
+        return Int(ccall(fn_ptr, UInt, (CRustVec, Ptr{Int32}, UInt), cvec, dest_ptr, dest_len))
+    elseif T == Int64
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_copy_to_array_i64)
+        return Int(ccall(fn_ptr, UInt, (CRustVec, Ptr{Int64}, UInt), cvec, dest_ptr, dest_len))
+    elseif T == Float32
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_copy_to_array_f32)
+        return Int(ccall(fn_ptr, UInt, (CRustVec, Ptr{Float32}, UInt), cvec, dest_ptr, dest_len))
+    elseif T == Float64
+        fn_ptr = Libdl.dlsym(lib, :rust_vec_copy_to_array_f64)
+        return Int(ccall(fn_ptr, UInt, (CRustVec, Ptr{Float64}, UInt), cvec, dest_ptr, dest_len))
+    else
+        error("Unsupported type for RustVec copy: $T")
+    end
+end
+
+"""
+    to_julia_vector(vec::RustVec{T}) -> Vector{T}
+
+Convert a `RustVec` to a new Julia `Vector` using efficient Rust FFI copy.
+
+This is the recommended way to convert `RustVec` data to Julia when you don't
+have a pre-allocated buffer.
+
+# Arguments
+- `vec::RustVec{T}`: The RustVec to convert
+
+# Returns
+- `Vector{T}`: A new Julia Vector containing a copy of the data
+
+# Throws
+- `ErrorException`: If the vec has been dropped
+
+# Example
+```julia
+rust_vec = create_rust_vec(Int32[1, 2, 3, 4, 5])
+julia_vec = to_julia_vector(rust_vec)
+@assert julia_vec == Int32[1, 2, 3, 4, 5]
+drop!(rust_vec)
+```
+
+# Note
+This function allocates a new Julia Vector. If you already have a buffer,
+use `copy_to_julia!` instead for better performance.
+
+See also: [`copy_to_julia!`](@ref), [`create_rust_vec`](@ref)
+"""
+function to_julia_vector(vec::RustVec{T}) where T
+    if vec.dropped || vec.ptr == C_NULL
+        error("Cannot convert a dropped RustVec to a Vector")
+    end
+
+    result = Vector{T}(undef, vec.len)
+    if vec.len > 0
+        copy_to_julia!(vec, result)
+    end
+    return result
 end

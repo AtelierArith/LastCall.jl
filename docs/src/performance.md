@@ -140,7 +140,7 @@ result = @rust add(10i32, 20i32)
 
 ### 所有権型の効率的な使用
 
-所有権型（`RustBox`, `RustRc`, `RustArc`）は、適切に使用することでメモリリークを防ぎます：
+所有権型（`RustBox`, `RustRc`, `RustArc`, `RustVec`）は、適切に使用することでメモリリークを防ぎます：
 
 ```julia
 # 一時的な割り当ては自動的にクリーンアップされる
@@ -150,6 +150,41 @@ box = RustBox(Int32(42))
 # 明示的なドロップ（早期解放が必要な場合）
 drop!(box)
 ```
+
+### RustVecの効率的な使用
+
+`RustVec`はRustの`Vec<T>`をJuliaから操作するための型です。大量のデータを扱う場合のベストプラクティス：
+
+```julia
+# Julia配列からRustVecを作成
+julia_vec = Int32[1, 2, 3, 4, 5]
+rust_vec = create_rust_vec(julia_vec)
+
+# 効率的な一括コピー（推奨）
+result = Vector{Int32}(undef, length(rust_vec))
+copy_to_julia!(rust_vec, result)
+
+# または to_julia_vector を使用
+result = to_julia_vector(rust_vec)
+
+# 要素ごとのアクセス（大量データでは非推奨）
+for i in 1:length(rust_vec)
+    value = rust_vec[i]  # FFI呼び出しが発生
+end
+
+# 使用後は明示的にドロップ
+drop!(rust_vec)
+```
+
+### RustVec vs Julia配列の選択
+
+| シナリオ | 推奨 |
+|----------|------|
+| Julia内での計算 | Julia配列 |
+| Rust関数への入力 | RustVec |
+| Rust関数からの出力 | RustVec → Julia配列に変換 |
+| 大量データの一時保存 | Julia配列（GCで管理） |
+| Rust側でのデータ操作 | RustVec |
 
 ### メモリリークの回避
 
@@ -176,7 +211,7 @@ end
 
 ### 基本的な演算
 
-以下のベンチマークは、Julia 1.9、Rust 1.70、macOS上で実行されました：
+以下のベンチマークは、Julia 1.12、Rust 1.92.0、macOS上で実行されました：
 
 | 操作 | Julia Native | @rust | @rust_llvm |
 |------|-------------|-------|------------|
@@ -193,16 +228,44 @@ end
 | Fibonacci (n=30) | 1.0x | 1.1x | 1.0x |
 | Sum Range (1..1000) | 1.0x | 1.2x | 1.1x |
 
+### 所有権型の操作
+
+| 操作 | 平均時間 | 備考 |
+|------|---------|------|
+| RustBox create+drop | ~170 ns | 単一値の割り当て・解放 |
+| RustRc create+drop | ~180 ns | 参照カウント付き |
+| RustRc clone+drop | ~180 ns | クローン操作 |
+| RustArc create+drop | ~190 ns | アトミック参照カウント |
+| RustArc clone+drop | ~200 ns | スレッドセーフ |
+
+### RustVec操作
+
+| 操作 | 平均時間 | 備考 |
+|------|---------|------|
+| RustVec(1000要素) create | ~1 μs | Julia配列からの変換 |
+| RustVec copy_to_julia!(1000要素) | ~500 ns | 効率的な一括コピー |
+| RustVec 要素アクセス | ~50 ns/要素 | FFI呼び出し含む |
+| RustVec push! | ~100 ns | 再アロケーションなしの場合 |
+
 **注意**: これらの結果は環境によって異なる場合があります。実際のパフォーマンスは、ハードウェア、OS、Julia/Rustのバージョンによって大きく変動します。
 
 ### ベンチマークの実行
 
-```julia
-# ベンチマークを実行
+```bash
+# 基本ベンチマーク
 julia --project benchmark/benchmarks.jl
 
-# LLVM統合のベンチマーク
+# LLVM統合ベンチマーク
 julia --project benchmark/benchmarks_llvm.jl
+
+# 所有権型ベンチマーク
+julia --threads=4 --project benchmark/benchmarks_ownership.jl
+
+# 配列操作ベンチマーク
+julia --project benchmark/benchmarks_arrays.jl
+
+# ジェネリクスベンチマーク
+julia --project benchmark/benchmarks_generics.jl
 ```
 
 ## パフォーマンスチューニングのヒント

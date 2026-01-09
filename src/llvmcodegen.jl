@@ -27,13 +27,10 @@ function LLVMCodeGenerator(;
     LLVMCodeGenerator(optimization_level, inline_threshold, enable_vectorization)
 end
 
-# Global code generator instance
-const DEFAULT_CODEGEN = Ref{LLVMCodeGenerator}()
+# Global code generator instance - initialized with default values
+const DEFAULT_CODEGEN = Ref{LLVMCodeGenerator}(LLVMCodeGenerator())
 
 function get_default_codegen()
-    if !isassigned(DEFAULT_CODEGEN)
-        DEFAULT_CODEGEN[] = LLVMCodeGenerator()
-    end
     return DEFAULT_CODEGEN[]
 end
 

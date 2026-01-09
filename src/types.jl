@@ -480,6 +480,9 @@ Base.cconvert(::Type{Ptr{Cvoid}}, v::RustVec) = v
 # Implement length for RustVec
 Base.length(v::RustVec) = Int(v.len)
 
+# is_valid for RustVec
+is_valid(v::RustVec) = !v.dropped && v.ptr != C_NULL
+
 """
     RustSlice{T}
 
@@ -539,11 +542,11 @@ function Base.getindex(vec::RustVec{T}, i::Int) where {T}
     if vec.dropped || vec.ptr == C_NULL
         error("Cannot index into a dropped RustVec")
     end
-    
+
     if i < 1 || i > length(vec)
         throw(BoundsError(vec, i))
     end
-    
+
     # Convert to 0-based index for pointer arithmetic
     idx = i - 1
     # Get pointer to the element
@@ -575,14 +578,14 @@ function Base.setindex!(vec::RustVec{T}, value, i::Int) where {T}
     if vec.dropped || vec.ptr == C_NULL
         error("Cannot set index in a dropped RustVec")
     end
-    
+
     if i < 1 || i > length(vec)
         throw(BoundsError(vec, i))
     end
-    
+
     # Convert value to type T
     typed_value = convert(T, value)
-    
+
     # Convert to 0-based index for pointer arithmetic
     idx = i - 1
     # Get pointer to the element
@@ -614,7 +617,7 @@ function Base.getindex(slice::RustSlice{T}, i::Int) where {T}
     if i < 1 || i > length(slice)
         throw(BoundsError(slice, i))
     end
-    
+
     # Convert to 0-based index for pointer arithmetic
     idx = i - 1
     # Get pointer to the element
@@ -644,7 +647,7 @@ function Base.iterate(vec::RustVec{T}, state::Int=1) where {T}
     if vec.dropped || vec.ptr == C_NULL || state > length(vec)
         return nothing
     end
-    
+
     value = vec[state]
     return (value, state + 1)
 end
@@ -666,7 +669,7 @@ function Base.iterate(slice::RustSlice{T}, state::Int=1) where {T}
     if state > length(slice)
         return nothing
     end
-    
+
     value = slice[state]
     return (value, state + 1)
 end
@@ -702,15 +705,15 @@ function Base.Vector(vec::RustVec{T}) where {T}
     if vec.dropped || vec.ptr == C_NULL
         error("Cannot convert a dropped RustVec to a Vector")
     end
-    
+
     len = length(vec)
     result = Vector{T}(undef, len)
-    
+
     # Copy elements
     for i in 1:len
         result[i] = vec[i]
     end
-    
+
     return result
 end
 
@@ -753,16 +756,16 @@ function RustVec(v::Vector{T}) where T
         Build it with: using Pkg; Pkg.build("LastCall")
         """)
     end
-    
+
     lib = get_rust_helpers_lib()
     if lib === nothing
         error("Rust helpers library not loaded")
     end
-    
+
     # Get pointer to data and length
     data_ptr = pointer(v)
     len = length(v)
-    
+
     # Call appropriate FFI function based on type
     if T == Int32
         fn_ptr = Libdl.dlsym(lib, :rust_vec_new_from_array_i32)
@@ -779,10 +782,10 @@ function RustVec(v::Vector{T}) where T
     else
         error("Unsupported type for RustVec creation: $T. Supported types: Int32, Int64, Float32, Float64")
     end
-    
+
     # Create RustVec from CVec
     vec = RustVec{T}(cvec.ptr, UInt(cvec.len), UInt(cvec.cap))
-    
+
     # Set up finalizer to call Rust drop function
     # drop_rust_vec is defined in memory.jl, which is loaded after types.jl
     # We use Base.invokelatest to resolve the function at runtime
@@ -800,11 +803,11 @@ function RustVec(v::Vector{T}) where T
             end
         end
     end
-    
+
     return vec
 end
 
-# Note: Type-specific constructors are not needed because 
+# Note: Type-specific constructors are not needed because
 # the generic RustVec(v::Vector{T}) handles type inference automatically
 
 # ============================================================================

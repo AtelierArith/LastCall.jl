@@ -131,52 +131,52 @@ end
             @testset "RustVec from Vector{Int32}" begin
                 julia_vec = Int32[1, 2, 3, 4, 5]
                 rust_vec = RustVec(julia_vec)
-                
+
                 @test length(rust_vec) == 5
                 @test !rust_vec.dropped
                 @test rust_vec.ptr != C_NULL
-                
+
                 # Test that we can access elements
                 @test rust_vec[1] == 1
                 @test rust_vec[5] == 5
-                
+
                 # Test conversion back to Julia
                 back_to_julia = Vector(rust_vec)
                 @test back_to_julia == julia_vec
-                
+
                 # Clean up
                 drop!(rust_vec)
                 @test rust_vec.dropped
             end
-            
+
             @testset "RustVec from Vector{Int64}" begin
                 julia_vec = Int64[10, 20, 30]
                 rust_vec = RustVec(julia_vec)
-                
+
                 @test length(rust_vec) == 3
                 @test rust_vec[1] == 10
                 @test rust_vec[3] == 30
-                
+
                 drop!(rust_vec)
             end
-            
+
             @testset "RustVec from Vector{Float32}" begin
                 julia_vec = Float32[1.5f0, 2.5f0, 3.5f0]
                 rust_vec = RustVec(julia_vec)
-                
+
                 @test length(rust_vec) == 3
                 @test rust_vec[1] ≈ 1.5f0
-                
+
                 drop!(rust_vec)
             end
-            
+
             @testset "RustVec from Vector{Float64}" begin
                 julia_vec = [1.5, 2.5, 3.5]
                 rust_vec = RustVec(julia_vec)
-                
+
                 @test length(rust_vec) == 3
                 @test rust_vec[1] ≈ 1.5
-                
+
                 drop!(rust_vec)
             end
         end
@@ -189,5 +189,159 @@ end
         @test hasmethod(RustVec, Tuple{Vector{Int64}})
         @test hasmethod(RustVec, Tuple{Vector{Float32}})
         @test hasmethod(RustVec, Tuple{Vector{Float64}})
+    end
+
+    # Full integration tests when Rust helpers library is available
+    if is_rust_helpers_available() && is_vec_helpers_available()
+        @testset "RustVec Full Integration" begin
+            @testset "create_rust_vec" begin
+                # Int32
+                julia_vec = Int32[1, 2, 3, 4, 5]
+                rust_vec = create_rust_vec(julia_vec)
+                @test length(rust_vec) == 5
+                @test !rust_vec.dropped
+                drop!(rust_vec)
+                @test rust_vec.dropped
+
+                # Int64
+                julia_vec64 = Int64[10, 20, 30]
+                rust_vec64 = create_rust_vec(julia_vec64)
+                @test length(rust_vec64) == 3
+                drop!(rust_vec64)
+
+                # Float32
+                julia_vecf32 = Float32[1.0f0, 2.0f0, 3.0f0]
+                rust_vecf32 = create_rust_vec(julia_vecf32)
+                @test length(rust_vecf32) == 3
+                drop!(rust_vecf32)
+
+                # Float64
+                julia_vecf64 = [1.0, 2.0, 3.0]
+                rust_vecf64 = create_rust_vec(julia_vecf64)
+                @test length(rust_vecf64) == 3
+                drop!(rust_vecf64)
+            end
+
+            @testset "rust_vec_get and rust_vec_set!" begin
+                julia_vec = Int32[10, 20, 30, 40, 50]
+                rust_vec = create_rust_vec(julia_vec)
+
+                # Test get (0-indexed)
+                @test rust_vec_get(rust_vec, 0) == 10
+                @test rust_vec_get(rust_vec, 2) == 30
+                @test rust_vec_get(rust_vec, 4) == 50
+
+                # Test bounds error
+                @test_throws BoundsError rust_vec_get(rust_vec, 5)
+                @test_throws BoundsError rust_vec_get(rust_vec, -1)
+
+                # Test set (0-indexed)
+                @test rust_vec_set!(rust_vec, 0, Int32(100))
+                @test rust_vec_get(rust_vec, 0) == 100
+
+                @test rust_vec_set!(rust_vec, 4, Int32(500))
+                @test rust_vec_get(rust_vec, 4) == 500
+
+                drop!(rust_vec)
+            end
+
+            @testset "copy_to_julia!" begin
+                julia_vec = Int32[1, 2, 3, 4, 5]
+                rust_vec = create_rust_vec(julia_vec)
+
+                # Copy to exact-size array
+                dest = Vector{Int32}(undef, 5)
+                copied = copy_to_julia!(rust_vec, dest)
+                @test copied == 5
+                @test dest == julia_vec
+
+                # Copy to smaller array
+                small_dest = Vector{Int32}(undef, 3)
+                copied_small = copy_to_julia!(rust_vec, small_dest)
+                @test copied_small == 3
+                @test small_dest == Int32[1, 2, 3]
+
+                # Copy to larger array (only fills first 5)
+                large_dest = Vector{Int32}(undef, 10)
+                fill!(large_dest, Int32(0))
+                copied_large = copy_to_julia!(rust_vec, large_dest)
+                @test copied_large == 5
+                @test large_dest[1:5] == julia_vec
+                @test large_dest[6:10] == zeros(Int32, 5)
+
+                drop!(rust_vec)
+            end
+
+            @testset "to_julia_vector" begin
+                julia_vec = Int32[100, 200, 300]
+                rust_vec = create_rust_vec(julia_vec)
+
+                result = to_julia_vector(rust_vec)
+                @test result == julia_vec
+                @test typeof(result) == Vector{Int32}
+
+                drop!(rust_vec)
+            end
+
+            @testset "push!" begin
+                julia_vec = Int32[1, 2, 3]
+                rust_vec = create_rust_vec(julia_vec)
+
+                @test length(rust_vec) == 3
+
+                # Push elements
+                push!(rust_vec, Int32(4))
+                @test length(rust_vec) == 4
+
+                push!(rust_vec, Int32(5))
+                @test length(rust_vec) == 5
+
+                # Verify contents
+                result = to_julia_vector(rust_vec)
+                @test result == Int32[1, 2, 3, 4, 5]
+
+                drop!(rust_vec)
+            end
+
+            @testset "Multiple Types Operations" begin
+                # Int64
+                vec64 = create_rust_vec(Int64[100, 200, 300])
+                @test rust_vec_get(vec64, 1) == 200
+                rust_vec_set!(vec64, 1, Int64(999))
+                @test rust_vec_get(vec64, 1) == 999
+                drop!(vec64)
+
+                # Float32
+                vecf32 = create_rust_vec(Float32[1.5f0, 2.5f0])
+                @test rust_vec_get(vecf32, 0) ≈ 1.5f0
+                push!(vecf32, Float32(3.5))
+                @test length(vecf32) == 3
+                drop!(vecf32)
+
+                # Float64
+                vecf64 = create_rust_vec([1.1, 2.2, 3.3])
+                @test rust_vec_get(vecf64, 2) ≈ 3.3
+                result = to_julia_vector(vecf64)
+                @test result ≈ [1.1, 2.2, 3.3]
+                drop!(vecf64)
+            end
+
+            @testset "Memory Safety" begin
+                # Create and drop many vectors
+                for i in 1:100
+                    v = create_rust_vec(Int32[i, i+1, i+2])
+                    @test length(v) == 3
+                    drop!(v)
+                    @test v.dropped
+                end
+
+                # Test error on dropped vec operations
+                v = create_rust_vec(Int32[1, 2, 3])
+                drop!(v)
+                @test_throws ErrorException rust_vec_get(v, 0)
+                @test_throws ErrorException rust_vec_set!(v, 0, Int32(1))
+                @test_throws ErrorException to_julia_vector(v)
+            end
+        end
     end
 end

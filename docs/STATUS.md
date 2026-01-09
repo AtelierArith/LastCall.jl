@@ -7,14 +7,15 @@
 | 項目 | 状態 |
 |------|------|
 | **Phase 1** | ✅ **完了** |
-| **Phase 2** | ✅ **主要機能完了** |
-| **総ソースコード** | 約5,800行以上（14ファイル） |
-| **総テストコード** | 約2,000行（8ファイル） |
-| **ベンチマーク** | 約1,450行（4ファイル） |
-| **実用例** | 246行（1ファイル） |
-| **テスト成功率** | ✅ 全テストパス |
-| **主要機能** | `@rust`, `rust""`, `@irust`, キャッシュ、所有権型、配列操作、ジェネリクス、エラーハンドリング強化 |
-| **次のステップ** | キャッシュシステム改善、CI/CD構築 |
+| **Phase 2** | ✅ **完了** |
+| **総ソースコード** | 約6,100行（14ファイル） |
+| **総テストコード** | 約2,100行（8ファイル） |
+| **ベンチマーク** | 約1,450行（5ファイル） |
+| **実用例** | 約830行（3ファイル） |
+| **Rustコード** | 約650行（rust_helpers） |
+| **テスト成功率** | ✅ 全732テストパス |
+| **主要機能** | `@rust`, `rust""`, `@irust`, キャッシュ、所有権型、RustVec完全統合、ジェネリクス、エラーハンドリング |
+| **次のステップ** | CI/CD構築、パッケージ配布準備 |
 
 ## プロジェクト概要
 
@@ -259,14 +260,17 @@ LastCall.jlは、JuliaからRustコードを直接呼び出すためのFFI（For
    - [ ] エラーハンドリングの改善
    - [ ] パフォーマンス改善の検証
 
-5. **配列・コレクション型の実用化**（優先度: 中）✅ **主要機能完了**
+5. **配列・コレクション型の実用化**（優先度: 中）✅ **完了**
    - [x] `RustVec<T>`, `RustSlice<T>`型定義完了
    - [x] インデックスアクセスの実装（`getindex`, `setindex!`）
    - [x] イテレータサポート（`iterate`, `IteratorSize`, `IteratorEltype`）
-   - [x] Julia配列への変換（`Vector(vec::RustVec)`, `collect(vec::RustVec)`）
+   - [x] Julia配列への変換（`to_julia_vector`, `copy_to_julia!`）
    - [x] 境界チェック（`BoundsError`の適切な処理）
-   - [x] テストスイート追加（`test/test_arrays.jl` 21テスト）
-   - [ ] Julia配列からの`RustVec`作成（Rust helpersライブラリのFFI関数が必要）
+   - [x] Julia配列からの`RustVec`作成（`create_rust_vec`）
+   - [x] 要素アクセス（`rust_vec_get`, `rust_vec_set!`）
+   - [x] push操作（`Base.push!`拡張）
+   - [x] テストスイート追加（`test/test_arrays.jl` 347行、271テスト）
+   - [x] Rust helpers Vec FFI関数完全実装（650行）
 
 6. **ジェネリクス対応**（優先度: 低）✅ **主要機能完了**
    - [x] 単相化（monomorphization）の実装（`monomorphize_function`）
@@ -348,14 +352,15 @@ LastCall.jl/
 
 | ファイル | 行数 | 説明 |
 |---------|------|------|
-| `test/runtests.jl` | 570 | メインテストスイート |
+| `test/runtests.jl` | 573 | メインテストスイート |
 | `test/test_cache.jl` | 149 | キャッシュ機能テスト |
-| `test/test_ownership.jl` | 131 | 所有権型テスト |
-| `test/test_llvmcall.jl` | 139 | llvmcall統合テスト |
+| `test/test_ownership.jl` | 359 | 所有権型テスト（マルチスレッドテスト含む） |
+| `test/test_llvmcall.jl` | 200 | llvmcall統合テスト |
 | `test/test_arrays.jl` | 193 | 配列・コレクション型テスト |
 | `test/test_error_handling.jl` | 168 | エラーハンドリング強化テスト |
 | `test/test_generics.jl` | 156 | ジェネリクス対応テスト |
-| **合計** | **1,506** | **全テストコード** |
+| `test/test_rust_helpers_integration.jl` | 169 | Rust helpersライブラリ統合テスト |
+| **合計** | **1,967** | **全テストコード** |
 
 ### テストカバレッジ（runtests.jl）
 
@@ -862,48 +867,63 @@ julia --project benchmark/benchmarks.jl
 
 | ファイル | 行数 | 説明 | Phase |
 |---------|------|------|-------|
-| LastCall.jl | 116 | メインモジュール | Core |
+| LastCall.jl | 118 | メインモジュール | Core |
 | types.jl | 834 | Rust型のJulia表現 | 1 |
 | typetranslation.jl | 273 | 型変換ロジック | 1 |
 | compiler.jl | 501 | rustcラッパー | 1 |
-| codegen.jl | 244 | ccall生成ロジック | 1 |
+| codegen.jl | 292 | ccall生成ロジック | 1 |
 | rustmacro.jl | 202 | @rustマクロ | 1 |
 | ruststr.jl | 808 | rust""と@irust実装 | 1 |
 | exceptions.jl | 512 | エラーハンドリング | 2 |
-| llvmintegration.jl | 235 | LLVM.jl統合 | 2 |
+| llvmintegration.jl | 254 | LLVM.jl統合 | 2 |
 | llvmoptimization.jl | 283 | LLVM最適化パス | 2 |
-| llvmcodegen.jl | 301 | LLVM IRコード生成 | 2 |
-| cache.jl | 343 | コンパイルキャッシュ | 2 |
-| memory.jl | 552 | 所有権型メモリ管理 | 2 |
+| llvmcodegen.jl | 401 | LLVM IRコード生成 | 2 |
+| cache.jl | 391 | コンパイルキャッシュ | 2 |
+| memory.jl | 930 | 所有権型・RustVecメモリ管理 | 2 |
 | generics.jl | 434 | ジェネリクス対応 | 2 |
-| **合計** | **5,638** | **全ソースコード** | - |
+| **合計** | **6,134** | **全ソースコード** | - |
 
 ### テストコード（test/）
 
 | ファイル | 行数 | テスト内容 |
 |---------|------|-----------|
-| runtests.jl | 570 | メインテストスイート |
+| runtests.jl | 573 | メインテストスイート |
 | test_cache.jl | 149 | キャッシュ機能テスト |
-| test_ownership.jl | 131 | 所有権型テスト |
-| test_llvmcall.jl | 139 | llvmcall統合テスト |
-| test_arrays.jl | 193 | 配列・コレクション型テスト |
+| test_ownership.jl | 359 | 所有権型テスト（マルチスレッド含む） |
+| test_llvmcall.jl | 200 | llvmcall統合テスト |
+| test_arrays.jl | 347 | 配列・RustVec完全統合テスト |
 | test_error_handling.jl | 168 | エラーハンドリング強化テスト |
 | test_generics.jl | 156 | ジェネリクス対応テスト |
-| **合計** | **1,506** | **全テストコード** |
+| test_rust_helpers_integration.jl | 169 | Rust helpersライブラリ統合テスト |
+| **合計** | **2,121** | **全テストコード（732テスト）** |
 
 ### Rust helpersライブラリ（deps/rust_helpers/）
 
 | ファイル | 行数 | 状態 |
 |---------|------|------|
 | Cargo.toml | 10 | ✅ 完了 |
-| src/lib.rs | 225 | 🚧 ほぼ完了（clone要修正） |
-| **合計** | **235** | **Rustコード** |
+| src/lib.rs | 648 | ✅ 完了（Box, Rc, Arc, Vec完全実装） |
+| **合計** | **658** | **Rustコード** |
 
 ### ベンチマーク（benchmark/）
 
 | ファイル | 行数 | 説明 |
 |---------|------|------|
-| benchmarks.jl | 197 | パフォーマンスベンチマーク |
+| benchmarks.jl | 196 | 基本パフォーマンスベンチマーク |
+| benchmarks_llvm.jl | 297 | LLVM統合ベンチマーク |
+| benchmarks_arrays.jl | 348 | 配列操作ベンチマーク |
+| benchmarks_generics.jl | 257 | ジェネリクスベンチマーク |
+| benchmarks_ownership.jl | 357 | 所有権型ベンチマーク |
+| **合計** | **1,455** | **全ベンチマークコード** |
+
+### 実用例（examples/）
+
+| ファイル | 行数 | 説明 |
+|---------|------|------|
+| basic_examples.jl | 260 | 基本的な使用例 |
+| advanced_examples.jl | 321 | 高度な使用例 |
+| ownership_examples.jl | 246 | 所有権型の使用例 |
+| **合計** | **827** | **全実用例コード** |
 
 ### ドキュメント（docs/）
 
@@ -922,12 +942,13 @@ julia --project benchmark/benchmarks.jl
 
 ### 総計
 
-- **Juliaコード**: 約7,300行以上（ソース + テスト + ベンチマーク）
-  - ソースコード: 5,638行（14ファイル）
-  - テストコード: 1,506行（7ファイル）
-  - ベンチマーク: 197行
-- **Rustコード**: 235行（deps/rust_helpers/）
-- **ドキュメント**: 10+ファイル
+- **Juliaコード**: 約10,500行（ソース + テスト + ベンチマーク + 実用例）
+  - ソースコード: 6,134行（14ファイル）
+  - テストコード: 2,121行（8ファイル、732テスト）
+  - ベンチマーク: 1,455行（5ファイル）
+  - 実用例: 827行（3ファイル）
+- **Rustコード**: 658行（deps/rust_helpers/）
+- **ドキュメント**: 15+ファイル
 
 ## 関連ドキュメント
 
@@ -943,25 +964,28 @@ julia --project benchmark/benchmarks.jl
 
 ## 📝 まとめ
 
-**LastCall.jl**は、JuliaからRustコードを直接呼び出すための包括的なFFIパッケージとして、Phase 1とPhase 2の主要機能を完成させました。
+**LastCall.jl**は、JuliaからRustコードを直接呼び出すための包括的なFFIパッケージとして、Phase 1とPhase 2を完成させました。
 
 ### 🎉 達成事項
 
 - ✅ **Phase 1完了**: 基本的なRust-Julia連携（`@rust`, `rust""`）
-- ✅ **Phase 2主要機能完了**: LLVM IR統合、最適化、キャッシュ、所有権型、ジェネリクス、配列操作、エラーハンドリング強化
-- ✅ **約7,300行のコード**: ソース（5,638行）、テスト（1,506行）、ベンチマーク（197行）
-- ✅ **1,506行のテストコード**: 包括的なテストカバレッジ（7ファイル）
+- ✅ **Phase 2完了**: LLVM IR統合、最適化、キャッシュ、所有権型、RustVec完全統合、ジェネリクス、エラーハンドリング強化
+- ✅ **約11,200行のコード**: Julia（10,500行）+ Rust（658行）
+- ✅ **732テスト**: 包括的なテストカバレッジ（8ファイル）
 - ✅ **完全なキャッシュシステム**: SHA256ベース、ディスク永続化
-- ✅ **所有権型メモリ管理**: Box, Rc, Arcのサポート準備完了
+- ✅ **所有権型メモリ管理**: Box, Rc, Arc完全統合（マルチスレッドテスト含む）
+- ✅ **RustVec完全統合**: Julia配列との相互変換、要素アクセス、push操作
 - ✅ **ジェネリクス対応**: 単相化、型推論、コード特殊化
-- ✅ **配列・コレクション型**: RustVec, RustSliceの完全サポート
 - ✅ **エラーハンドリング強化**: 詳細なエラーメッセージ、自動修正提案
+- ✅ **包括的なベンチマーク**: 所有権型、配列、LLVM統合、ジェネリクス
+- ✅ **ドキュメント充実**: パフォーマンスガイド、APIドキュメント
 
 ### 🚧 次の一歩
 
-**最優先課題**: Rust helpersライブラリのコンパイルとロード機能の実装
+**優先課題**:
 
-この作業により、所有権型の完全な統合テストが可能になり、LastCall.jlの実用性が大幅に向上します。
+1. **CI/CDパイプライン構築**: GitHub Actionsでの自動テスト・ビルド
+2. **パッケージ配布準備**: Julia General Registryへの登録、バイナリ配布
 
 ### 🔗 クイックスタート
 
@@ -972,8 +996,31 @@ julia --project -e 'using Pkg; Pkg.test()'
 # ベンチマーク実行
 julia --project benchmark/benchmarks.jl
 
+# 所有権型ベンチマーク
+julia --threads=4 --project benchmark/benchmarks_ownership.jl
+
 # キャッシュクリア
 julia --project -e 'using LastCall; clear_cache()'
 ```
 
-**注意**: Rust helpersライブラリがコンパイルされていない場合、所有権型の完全な機能テストはスキップされます。
+### 📚 RustVec使用例
+
+```julia
+using LastCall
+
+# Julia配列からRustVecを作成
+julia_vec = Int32[1, 2, 3, 4, 5]
+rust_vec = create_rust_vec(julia_vec)
+
+# 要素アクセス
+rust_vec[1]  # => 1 (1-indexed)
+rust_vec_get(rust_vec, 0)  # => 1 (0-indexed)
+
+# 効率的なJulia配列への変換
+result = to_julia_vector(rust_vec)
+
+# クリーンアップ
+drop!(rust_vec)
+```
+
+**注意**: Rust helpersライブラリがコンパイルされていない場合、所有権型・RustVecの機能はスキップされます。

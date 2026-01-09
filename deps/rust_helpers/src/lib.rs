@@ -280,8 +280,32 @@ pub extern "C" fn rust_vec_new_i32() -> CVec {
 /// Drop a Vec<i32>
 #[no_mangle]
 pub unsafe extern "C" fn rust_vec_drop_i32(vec: CVec) {
-    if !vec.ptr.is_null() && vec.len > 0 {
+    if !vec.ptr.is_null() && vec.cap > 0 {
         let _ = Vec::from_raw_parts(vec.ptr as *mut i32, vec.len, vec.cap);
+    }
+}
+
+/// Drop a Vec<i64>
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_drop_i64(vec: CVec) {
+    if !vec.ptr.is_null() && vec.cap > 0 {
+        let _ = Vec::from_raw_parts(vec.ptr as *mut i64, vec.len, vec.cap);
+    }
+}
+
+/// Drop a Vec<f32>
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_drop_f32(vec: CVec) {
+    if !vec.ptr.is_null() && vec.cap > 0 {
+        let _ = Vec::from_raw_parts(vec.ptr as *mut f32, vec.len, vec.cap);
+    }
+}
+
+/// Drop a Vec<f64>
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_drop_f64(vec: CVec) {
+    if !vec.ptr.is_null() && vec.cap > 0 {
+        let _ = Vec::from_raw_parts(vec.ptr as *mut f64, vec.len, vec.cap);
     }
 }
 
@@ -297,16 +321,16 @@ pub unsafe extern "C" fn rust_vec_new_from_array_i32(data: *const i32, len: usiz
             cap: 0,
         };
     }
-    
+
     // Create a Vec from the slice
     let slice = std::slice::from_raw_parts(data, len);
     let vec: Vec<i32> = slice.to_vec();
-    
+
     let len = vec.len();
     let cap = vec.capacity();
     let ptr = vec.as_ptr() as *mut c_void;
     std::mem::forget(vec);  // Transfer ownership to caller
-    
+
     CVec { ptr, len, cap }
 }
 
@@ -322,15 +346,15 @@ pub unsafe extern "C" fn rust_vec_new_from_array_i64(data: *const i64, len: usiz
             cap: 0,
         };
     }
-    
+
     let slice = std::slice::from_raw_parts(data, len);
     let vec: Vec<i64> = slice.to_vec();
-    
+
     let len = vec.len();
     let cap = vec.capacity();
     let ptr = vec.as_ptr() as *mut c_void;
     std::mem::forget(vec);
-    
+
     CVec { ptr, len, cap }
 }
 
@@ -346,15 +370,15 @@ pub unsafe extern "C" fn rust_vec_new_from_array_f32(data: *const f32, len: usiz
             cap: 0,
         };
     }
-    
+
     let slice = std::slice::from_raw_parts(data, len);
     let vec: Vec<f32> = slice.to_vec();
-    
+
     let len = vec.len();
     let cap = vec.capacity();
     let ptr = vec.as_ptr() as *mut c_void;
     std::mem::forget(vec);
-    
+
     CVec { ptr, len, cap }
 }
 
@@ -370,14 +394,255 @@ pub unsafe extern "C" fn rust_vec_new_from_array_f64(data: *const f64, len: usiz
             cap: 0,
         };
     }
-    
+
     let slice = std::slice::from_raw_parts(data, len);
     let vec: Vec<f64> = slice.to_vec();
-    
+
     let len = vec.len();
     let cap = vec.capacity();
     let ptr = vec.as_ptr() as *mut c_void;
     std::mem::forget(vec);
-    
+
+    CVec { ptr, len, cap }
+}
+
+// ============================================================================
+// Vec<T> element access
+// ============================================================================
+
+/// Get an element from Vec<i32> by index
+/// Returns 0 if index is out of bounds (caller should check bounds first)
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_get_i32(vec: CVec, index: usize) -> i32 {
+    if vec.ptr.is_null() || index >= vec.len {
+        return 0;
+    }
+    let slice = std::slice::from_raw_parts(vec.ptr as *const i32, vec.len);
+    slice[index]
+}
+
+/// Get an element from Vec<i64> by index
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_get_i64(vec: CVec, index: usize) -> i64 {
+    if vec.ptr.is_null() || index >= vec.len {
+        return 0;
+    }
+    let slice = std::slice::from_raw_parts(vec.ptr as *const i64, vec.len);
+    slice[index]
+}
+
+/// Get an element from Vec<f32> by index
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_get_f32(vec: CVec, index: usize) -> f32 {
+    if vec.ptr.is_null() || index >= vec.len {
+        return 0.0;
+    }
+    let slice = std::slice::from_raw_parts(vec.ptr as *const f32, vec.len);
+    slice[index]
+}
+
+/// Get an element from Vec<f64> by index
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_get_f64(vec: CVec, index: usize) -> f64 {
+    if vec.ptr.is_null() || index >= vec.len {
+        return 0.0;
+    }
+    let slice = std::slice::from_raw_parts(vec.ptr as *const f64, vec.len);
+    slice[index]
+}
+
+/// Set an element in Vec<i32> by index
+/// Returns true if successful, false if index is out of bounds
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_set_i32(vec: CVec, index: usize, value: i32) -> bool {
+    if vec.ptr.is_null() || index >= vec.len {
+        return false;
+    }
+    let slice = std::slice::from_raw_parts_mut(vec.ptr as *mut i32, vec.len);
+    slice[index] = value;
+    true
+}
+
+/// Set an element in Vec<i64> by index
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_set_i64(vec: CVec, index: usize, value: i64) -> bool {
+    if vec.ptr.is_null() || index >= vec.len {
+        return false;
+    }
+    let slice = std::slice::from_raw_parts_mut(vec.ptr as *mut i64, vec.len);
+    slice[index] = value;
+    true
+}
+
+/// Set an element in Vec<f32> by index
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_set_f32(vec: CVec, index: usize, value: f32) -> bool {
+    if vec.ptr.is_null() || index >= vec.len {
+        return false;
+    }
+    let slice = std::slice::from_raw_parts_mut(vec.ptr as *mut f32, vec.len);
+    slice[index] = value;
+    true
+}
+
+/// Set an element in Vec<f64> by index
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_set_f64(vec: CVec, index: usize, value: f64) -> bool {
+    if vec.ptr.is_null() || index >= vec.len {
+        return false;
+    }
+    let slice = std::slice::from_raw_parts_mut(vec.ptr as *mut f64, vec.len);
+    slice[index] = value;
+    true
+}
+
+// ============================================================================
+// Vec<T> copy to C array
+// ============================================================================
+
+/// Copy Vec<i32> contents to a C array
+/// Returns the number of elements copied
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_copy_to_array_i32(vec: CVec, dest: *mut i32, dest_len: usize) -> usize {
+    if vec.ptr.is_null() || dest.is_null() {
+        return 0;
+    }
+    let copy_len = std::cmp::min(vec.len, dest_len);
+    let src_slice = std::slice::from_raw_parts(vec.ptr as *const i32, copy_len);
+    let dest_slice = std::slice::from_raw_parts_mut(dest, copy_len);
+    dest_slice.copy_from_slice(src_slice);
+    copy_len
+}
+
+/// Copy Vec<i64> contents to a C array
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_copy_to_array_i64(vec: CVec, dest: *mut i64, dest_len: usize) -> usize {
+    if vec.ptr.is_null() || dest.is_null() {
+        return 0;
+    }
+    let copy_len = std::cmp::min(vec.len, dest_len);
+    let src_slice = std::slice::from_raw_parts(vec.ptr as *const i64, copy_len);
+    let dest_slice = std::slice::from_raw_parts_mut(dest, copy_len);
+    dest_slice.copy_from_slice(src_slice);
+    copy_len
+}
+
+/// Copy Vec<f32> contents to a C array
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_copy_to_array_f32(vec: CVec, dest: *mut f32, dest_len: usize) -> usize {
+    if vec.ptr.is_null() || dest.is_null() {
+        return 0;
+    }
+    let copy_len = std::cmp::min(vec.len, dest_len);
+    let src_slice = std::slice::from_raw_parts(vec.ptr as *const f32, copy_len);
+    let dest_slice = std::slice::from_raw_parts_mut(dest, copy_len);
+    dest_slice.copy_from_slice(src_slice);
+    copy_len
+}
+
+/// Copy Vec<f64> contents to a C array
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_copy_to_array_f64(vec: CVec, dest: *mut f64, dest_len: usize) -> usize {
+    if vec.ptr.is_null() || dest.is_null() {
+        return 0;
+    }
+    let copy_len = std::cmp::min(vec.len, dest_len);
+    let src_slice = std::slice::from_raw_parts(vec.ptr as *const f64, copy_len);
+    let dest_slice = std::slice::from_raw_parts_mut(dest, copy_len);
+    dest_slice.copy_from_slice(src_slice);
+    copy_len
+}
+
+// ============================================================================
+// Vec<T> push operations
+// ============================================================================
+
+/// Push a value to Vec<i32>
+/// Returns a new CVec (the original vec is consumed)
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_push_i32(vec: CVec, value: i32) -> CVec {
+    if vec.ptr.is_null() {
+        // Create new vec with single element
+        let mut new_vec = Vec::with_capacity(1);
+        new_vec.push(value);
+        let len = new_vec.len();
+        let cap = new_vec.capacity();
+        let ptr = new_vec.as_ptr() as *mut c_void;
+        std::mem::forget(new_vec);
+        return CVec { ptr, len, cap };
+    }
+
+    let mut v = Vec::from_raw_parts(vec.ptr as *mut i32, vec.len, vec.cap);
+    v.push(value);
+    let len = v.len();
+    let cap = v.capacity();
+    let ptr = v.as_ptr() as *mut c_void;
+    std::mem::forget(v);
+    CVec { ptr, len, cap }
+}
+
+/// Push a value to Vec<i64>
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_push_i64(vec: CVec, value: i64) -> CVec {
+    if vec.ptr.is_null() {
+        let mut new_vec = Vec::with_capacity(1);
+        new_vec.push(value);
+        let len = new_vec.len();
+        let cap = new_vec.capacity();
+        let ptr = new_vec.as_ptr() as *mut c_void;
+        std::mem::forget(new_vec);
+        return CVec { ptr, len, cap };
+    }
+
+    let mut v = Vec::from_raw_parts(vec.ptr as *mut i64, vec.len, vec.cap);
+    v.push(value);
+    let len = v.len();
+    let cap = v.capacity();
+    let ptr = v.as_ptr() as *mut c_void;
+    std::mem::forget(v);
+    CVec { ptr, len, cap }
+}
+
+/// Push a value to Vec<f32>
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_push_f32(vec: CVec, value: f32) -> CVec {
+    if vec.ptr.is_null() {
+        let mut new_vec = Vec::with_capacity(1);
+        new_vec.push(value);
+        let len = new_vec.len();
+        let cap = new_vec.capacity();
+        let ptr = new_vec.as_ptr() as *mut c_void;
+        std::mem::forget(new_vec);
+        return CVec { ptr, len, cap };
+    }
+
+    let mut v = Vec::from_raw_parts(vec.ptr as *mut f32, vec.len, vec.cap);
+    v.push(value);
+    let len = v.len();
+    let cap = v.capacity();
+    let ptr = v.as_ptr() as *mut c_void;
+    std::mem::forget(v);
+    CVec { ptr, len, cap }
+}
+
+/// Push a value to Vec<f64>
+#[no_mangle]
+pub unsafe extern "C" fn rust_vec_push_f64(vec: CVec, value: f64) -> CVec {
+    if vec.ptr.is_null() {
+        let mut new_vec = Vec::with_capacity(1);
+        new_vec.push(value);
+        let len = new_vec.len();
+        let cap = new_vec.capacity();
+        let ptr = new_vec.as_ptr() as *mut c_void;
+        std::mem::forget(new_vec);
+        return CVec { ptr, len, cap };
+    }
+
+    let mut v = Vec::from_raw_parts(vec.ptr as *mut f64, vec.len, vec.cap);
+    v.push(value);
+    let len = v.len();
+    let cap = v.capacity();
+    let ptr = v.as_ptr() as *mut c_void;
+    std::mem::forget(v);
     CVec { ptr, len, cap }
 }

@@ -111,6 +111,16 @@ clone
 is_rust_helpers_available
 ```
 
+## RustVec Operations
+
+```@docs
+create_rust_vec
+rust_vec_get
+rust_vec_set!
+copy_to_julia!
+to_julia_vector
+```
+
 ## Cache Management
 
 ```@docs

@@ -217,9 +217,9 @@ will be implemented in a future version.
 
 # Example
 ```julia
-metadata = load_cache_metadata("abc123...")
-if metadata !== nothing
-    println("Cache created at: $(metadata.created_at)")
+meta = load_cache_metadata("abc123...")
+if meta !== nothing
+    println("Cache created at: \$(meta.created_at)")
 end
 ```
 """
@@ -321,8 +321,8 @@ Remove cache entries older than max_age_days.
 # Example
 ```julia
 # Remove cache entries older than 7 days
-removed = cleanup_old_cache(7)
-println("Removed $removed old cache entries")
+count = cleanup_old_cache(7)
+println("Removed \$count old cache entries")
 ```
 """
 function cleanup_old_cache(max_age_days::Int = 30)

@@ -1,5 +1,7 @@
 # Rust compiler (rustc) wrapper for LLVM IR generation
 
+using RustToolChain: rustc, cargo
+
 """
     RustCompiler
 
@@ -79,11 +81,11 @@ end
 """
     check_rustc_available() -> Bool
 
-Check if rustc is available in the system PATH.
+Check if rustc is available using RustToolChain.jl.
 """
 function check_rustc_available()
     try
-        run(pipeline(`rustc --version`, devnull))
+        run(pipeline(`$(rustc()) --version`, devnull))
         return true
     catch
         return false
@@ -93,11 +95,11 @@ end
 """
     get_rustc_version() -> String
 
-Get the version of rustc.
+Get the version of rustc using RustToolChain.jl.
 """
 function get_rustc_version()
     try
-        return strip(read(`rustc --version`, String))
+        return strip(read(`$(rustc()) --version`, String))
     catch e
         error("Failed to get rustc version: $e")
     end
@@ -174,17 +176,20 @@ function compile_rust_to_llvm_ir(code::String; compiler::RustCompiler = get_defa
     # Write the Rust code to the temporary file
     write(rs_file, code)
 
-    # Build the rustc command
-    cmd_args = String[
-        "rustc",
-        "--emit=llvm-ir",
-        "--crate-type=cdylib",
-        "-C", "opt-level=$(compiler.optimization_level)",
-        "-C", "panic=abort",  # Simpler error handling for FFI
-        "--target=$(compiler.target_triple)",
-        "-o", ll_file,
-        rs_file
-    ]
+    # Build the rustc command using RustToolChain.jl
+    rustc_cmd = rustc()
+    cmd_args = vcat(
+        [string(rustc_cmd.exec[1])],  # Get the actual rustc path from RustToolChain
+        [
+            "--emit=llvm-ir",
+            "--crate-type=cdylib",
+            "-C", "opt-level=$(compiler.optimization_level)",
+            "-C", "panic=abort",  # Simpler error handling for FFI
+            "--target=$(compiler.target_triple)",
+            "-o", ll_file,
+            rs_file
+        ]
+    )
 
     if compiler.emit_debug_info
         push!(cmd_args, "-g")
@@ -302,16 +307,19 @@ function compile_rust_to_shared_lib(code::String; compiler::RustCompiler = get_d
     # Write the Rust code to the temporary file
     write(rs_file, code)
 
-    # Build the rustc command for shared library
-    cmd_args = String[
-        "rustc",
-        "--crate-type=cdylib",
-        "-C", "opt-level=$(compiler.optimization_level)",
-        "-C", "panic=abort",
-        "--target=$(compiler.target_triple)",
-        "-o", lib_file,
-        rs_file
-    ]
+    # Build the rustc command for shared library using RustToolChain.jl
+    rustc_cmd = rustc()
+    cmd_args = vcat(
+        [string(rustc_cmd.exec[1])],  # Get the actual rustc path from RustToolChain
+        [
+            "--crate-type=cdylib",
+            "-C", "opt-level=$(compiler.optimization_level)",
+            "-C", "panic=abort",
+            "--target=$(compiler.target_triple)",
+            "-o", lib_file,
+            rs_file
+        ]
+    )
 
     if compiler.emit_debug_info
         push!(cmd_args, "-g")

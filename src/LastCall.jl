@@ -79,6 +79,9 @@ export clone  # For RustRc and RustArc
 export is_rust_helpers_available  # Check if Rust helpers library is loaded
 export get_rust_helpers_lib, get_rust_helpers_lib_path  # For testing and advanced usage
 
+# RustVec operations (Phase 2)
+export create_rust_vec, rust_vec_get, rust_vec_set!, copy_to_julia!, to_julia_vector
+
 # Caching (Phase 2)
 export clear_cache, get_cache_size, list_cached_libraries, cleanup_old_cache
 

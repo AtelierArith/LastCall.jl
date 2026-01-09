@@ -1,32 +1,34 @@
 # Build script for LastCall.jl
 # This script verifies that the required tools are available and builds Rust helpers
 
+using RustToolChain: rustc, cargo
+
 """
     check_rust_toolchain() -> Bool
 
-Check if Rust toolchain (rustc and cargo) is available.
+Check if Rust toolchain (rustc and cargo) is available using RustToolChain.jl.
 Returns true if both are available, false otherwise.
 """
 function check_rust_toolchain()
     # Check for rustc
     rustc_available = false
     try
-        rustc_version = read(`rustc --version`, String)
+        rustc_version = read(`$(rustc()) --version`, String)
         println("✓ Found rustc: ", strip(rustc_version))
         rustc_available = true
     catch e
-        println("✗ rustc not found. Please install Rust from https://rustup.rs/")
+        println("✗ rustc not found. RustToolChain.jl should provide rustc.")
         return false
     end
 
     # Check for cargo (required for building Rust helpers)
     cargo_available = false
     try
-        cargo_version = read(`cargo --version`, String)
+        cargo_version = read(`$(cargo()) --version`, String)
         println("✓ Found cargo: ", strip(cargo_version))
         cargo_available = true
     catch
-        println("✗ cargo not found. Please install Rust from https://rustup.rs/")
+        println("✗ cargo not found. RustToolChain.jl should provide cargo.")
         return false
     end
 
@@ -71,21 +73,21 @@ function build_rust_helpers()
     println("  Directory: $helpers_dir")
     println("  Cargo.toml: $cargo_toml")
 
-    # Build with cargo
+    # Build with cargo using RustToolChain.jl
     try
-        println("  Running: cargo build --release --manifest-path $cargo_toml")
-        run(`cargo build --release --manifest-path $cargo_toml`)
+        println("  Running: $(cargo()) build --release --manifest-path $cargo_toml")
+        run(`$(cargo()) build --release --manifest-path $cargo_toml`)
         println("  ✓ Cargo build completed successfully")
     catch e
         error("""
         Failed to build Rust helpers library: $e
-        
+
         Common issues:
         1. Rust toolchain not installed - install from https://rustup.rs/
         2. Cargo.toml has syntax errors
         3. Missing dependencies in Cargo.toml
         4. Insufficient permissions to write to target directory
-        
+
         Try running manually:
             cd $helpers_dir
             cargo build --release
@@ -109,10 +111,10 @@ function build_rust_helpers()
     if !isfile(lib_path)
         error("""
         Built library not found at expected path: $lib_path
-        
+
         The build may have succeeded but the library was not created.
         Check the cargo build output for errors.
-        
+
         Expected location: $target_dir
         Library name: $lib_name
         """)
@@ -191,6 +193,8 @@ function main()
 end
 
 # Run the build process
-if abspath(PROGRAM_FILE) == @__FILE__ || abspath(PROGRAM_FILE) == abspath(@__FILE__)
+# When called as a build script, PROGRAM_FILE will match this file
+const BUILD_FILE = @__FILE__
+if abspath(PROGRAM_FILE) == abspath(BUILD_FILE)
     main()
 end
