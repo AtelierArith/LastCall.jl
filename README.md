@@ -506,7 +506,6 @@ MIT License (see LICENSE file)
 
 - [Cxx.jl](https://github.com/JuliaInterop/Cxx.jl) - C++ FFI for Julia
 - [CxxWrap.jl](https://github.com/JuliaInterop/CxxWrap.jl) - Modern C++ wrapper generator
-- [RustCall.jl](https://github.com/JuliaInterop/RustCall.jl) - Another Rust FFI project (different approach)
 
 ## Documentation
 
