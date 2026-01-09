@@ -248,15 +248,37 @@ They are documented here for completeness but should not be used directly by use
 
 ```@autodocs
 Modules = [LastCall]
+Private = true
 Filter = t -> begin
     # Exclude items already documented in @docs blocks above
-    excluded = [
-        RustResult, RustOption, RustBox, RustRc, RustArc, RustVec, RustSlice,
-        RustPtr, RustRef, RustString, RustStr,
-        RustError, CompilationError, RuntimeError, CargoBuildError, DependencyResolutionError,
-        RustCompiler, OptimizationConfig, RustFunctionInfo,
-        DependencySpec, CargoProject,
-        GENERIC_FUNCTION_REGISTRY, MONOMORPHIZED_FUNCTIONS,
+    excluded_names = [
+        :RustResult, :RustOption, :RustBox, :RustRc, :RustArc, :RustVec, :RustSlice,
+        :RustPtr, :RustRef, :RustString, :RustStr,
+        :RustError, :CompilationError, :RuntimeError, :CargoBuildError, :DependencyResolutionError,
+        :RustCompiler, :OptimizationConfig, :RustFunctionInfo,
+        :DependencySpec, :CargoProject,
+        :GENERIC_FUNCTION_REGISTRY, :MONOMORPHIZED_FUNCTIONS,
+        # Exclude public functions already documented
+        :unwrap, :unwrap_or, :is_ok, :is_err, :is_some, :is_none,
+        :result_to_exception, :unwrap_or_throw,
+        :rusttype_to_julia, :juliatype_to_rust,
+        :rust_string_to_julia, :rust_str_to_julia,
+        :julia_string_to_rust, :julia_string_to_cstring, :cstring_to_julia_string,
+        :format_rustc_error, :suggest_fix_for_error,
+        :compile_with_recovery, :check_rustc_available, :get_rustc_version,
+        :get_default_compiler, :set_default_compiler, :compile_rust_to_shared_lib,
+        :compile_rust_to_llvm_ir, :load_llvm_ir, :wrap_rust_code,
+        :drop!, :is_dropped, :is_valid, :clone, :is_rust_helpers_available,
+        :get_rust_helpers_lib, :get_rust_helpers_lib_path,
+        :create_rust_vec, :rust_vec_get, :rust_vec_set!, :copy_to_julia!, :to_julia_vector,
+        :clear_cache, :get_cache_size, :list_cached_libraries, :cleanup_old_cache,
+        :optimize_module!, :optimize_for_speed!, :optimize_for_size!,
+        :compile_and_register_rust_function,
+        :register_generic_function, :call_generic_function, :is_generic_function,
+        :monomorphize_function, :specialize_generic_code, :infer_type_parameters,
+        :parse_dependencies_from_code, :has_dependencies,
+        :create_cargo_project, :build_cargo_project,
+        :clear_cargo_cache, :get_cargo_cache_size,
     ]
     # Get the binding name
     name = try
@@ -264,7 +286,7 @@ Filter = t -> begin
     catch
         return true
     end
-    # Exclude if in excluded list or if name starts with underscore (internal)
-    return !(t in excluded) && !startswith(string(name), "_")
+    # Exclude if in excluded list
+    return !(name in excluded_names)
 end
 ```
