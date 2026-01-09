@@ -22,6 +22,9 @@ include("test_llvmcall.jl")
 # Include Rust helpers integration tests
 include("test_rust_helpers_integration.jl")
 
+# Include documentation examples tests
+include("test_docs_examples.jl")
+
 @testset "LastCall.jl" begin
 
     @testset "Type Mappings" begin

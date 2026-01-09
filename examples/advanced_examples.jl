@@ -43,8 +43,8 @@ pub extern "C" fn identity_f64(x: f64) -> f64 {
 
 # Register as generic function (simplified - in practice, you'd parse the generic signature)
 println("Generic functions registered")
-println("identity_i32(42) = $(@rust identity_i32(42i32))")
-println("identity_i64(123456789) = $(@rust identity_i64(123456789i64))")
+println("identity_i32(42) = $(@rust identity_i32(Int32(42)))")
+println("identity_i64(123456789) = $(@rust identity_i64(Int64(123456789)))")
 println("identity_f64(3.14159) = $(@rust identity_f64(3.14159))")
 println()
 
@@ -98,7 +98,7 @@ println("Example 3: LLVM Optimization")
 println("-" ^ 40)
 
 # Define a function for optimization
-rust_code = """
+rust"""
 #[no_mangle]
 pub extern "C" fn optimized_compute(x: f64) -> f64 {
     let mut result = 0.0;
@@ -109,18 +109,10 @@ pub extern "C" fn optimized_compute(x: f64) -> f64 {
 }
 """
 
-rust"""$rust_code"""
-
-# Get the Rust module
-mod = get_rust_module(rust_code)
-
-# Apply optimization
-if mod !== nothing
-    optimize_for_speed!(mod)
-    println("LLVM optimization applied")
-else
-    println("Note: LLVM optimization requires module access")
-end
+# Test the optimized function
+result = @rust optimized_compute(2.0)
+println("optimized_compute(2.0) = $result")
+println("Note: LLVM optimization is applied automatically by rustc")
 println()
 
 # ============================================================================
@@ -141,8 +133,8 @@ pub extern "C" fn checked_divide(a: i32, b: i32) -> i32 {
 """
 
 # Test error handling
-result1 = @rust checked_divide(10i32, 2i32)
-result2 = @rust checked_divide(10i32, 0i32)
+result1 = @rust checked_divide(Int32(10), Int32(2))
+result2 = @rust checked_divide(Int32(10), Int32(0))
 
 println("checked_divide(10, 2) = $result1")
 println("checked_divide(10, 0) = $result2 (error code)")
@@ -185,10 +177,10 @@ pub extern "C" fn factorial(n: i32) -> i64 {
 }
 """
 
-println("fibonacci(10) = $(@rust fibonacci(10i32))")
-println("fibonacci(20) = $(@rust fibonacci(20i32))")
-println("factorial(5) = $(@rust factorial(5i32))")
-println("factorial(10) = $(@rust factorial(10i32))")
+println("fibonacci(10) = $(@rust fibonacci(Int32(10)))")
+println("fibonacci(20) = $(@rust fibonacci(Int32(20)))")
+println("factorial(5) = $(@rust factorial(Int32(5)))")
+println("factorial(10) = $(@rust factorial(Int32(10)))")
 println()
 
 # ============================================================================
@@ -213,26 +205,29 @@ println("Length (simplified): $result")
 println()
 
 # ============================================================================
-# Example 7: Multiple Libraries
+# Example 7: Multiple Functions in One Library
 # ============================================================================
-println("Example 7: Multiple Libraries")
+println("Example 7: Multiple Functions in One Library")
 println("-" ^ 40)
 
-# Define first library
+# Define multiple functions
 rust"""
 #[no_mangle]
 pub extern "C" fn lib1_function(x: i32) -> i32 {
     x * 2
 }
+
+#[no_mangle]
+pub extern "C" fn lib1_square(x: i32) -> i32 {
+    x * x
+}
 """
 
-lib1_name = get_current_library()
-result1 = @rust lib1_function(5i32)
-println("Library 1: lib1_function(5) = $result1")
-
-# Define second library (would be in a separate rust"" block in practice)
-# For demonstration, we show the concept
-println("Note: Multiple libraries can be loaded and used independently")
+result1 = @rust lib1_function(Int32(5))
+result2 = @rust lib1_square(Int32(5))
+println("lib1_function(5) = $result1")
+println("lib1_square(5) = $result2")
+println("Note: Multiple rust\"\" blocks create separate libraries")
 println()
 
 # ============================================================================
@@ -241,7 +236,7 @@ println()
 println("Example 8: Performance Optimization")
 println("-" ^ 40)
 
-# Register function for faster calls
+# Define a function for performance testing
 rust"""
 #[no_mangle]
 pub extern "C" fn fast_multiply(a: i32, b: i32) -> i32 {
@@ -249,12 +244,12 @@ pub extern "C" fn fast_multiply(a: i32, b: i32) -> i32 {
 }
 """
 
-# Register the function
-register_function("fast_multiply", get_current_library(), Int32, [Int32, Int32])
+# Call the function
+result = @rust fast_multiply(Int32(7), Int32(8))
+println("fast_multiply(7, 8) = $result")
 
-# Now calls are optimized
-result = @rust fast_multiply(7i32, 8i32)
-println("fast_multiply(7, 8) = $result (registered function)")
+# Demonstrate caching benefit
+println("Note: Subsequent calls use cached compiled library for better performance")
 println()
 
 # ============================================================================
@@ -273,7 +268,7 @@ pub extern "C" fn cached_function(x: i32) -> i32 {
 
 # Second call to the same code (should use cache)
 # In practice, the cache is used automatically
-result = @rust cached_function(42i32)
+result = @rust cached_function(Int32(42))
 println("cached_function(42) = $result")
 println("Note: Cache is used automatically for identical code")
 println()

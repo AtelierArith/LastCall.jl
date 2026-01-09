@@ -148,6 +148,8 @@ LastCall.jl automatically maps Rust types to Julia types:
 LastCall.jl supports passing Julia strings to Rust functions expecting C strings:
 
 ```julia
+using LastCall
+
 rust"""
 #[no_mangle]
 pub extern "C" fn string_length(s: *const u8) -> u32 {
@@ -429,9 +431,9 @@ LastCall.jl has completed **Phase 1** and **Phase 2 major features**. The packag
 - ✅ Generics support (monomorphization, type parameter inference)
 
 **Planned:**
-- ⏳ Generics support
 - ⏳ Lifetime/borrow checker integration
 - ⏳ Advanced Rust features
+- ⏳ Enhanced trait bounds parsing for generics
 
 ## Examples
 
@@ -460,6 +462,8 @@ See the `test/` directory for comprehensive examples:
 - `test/test_llvmcall.jl` - LLVM integration tests
 - `test/test_generics.jl` - Generics support tests
 - `test/test_error_handling.jl` - Error handling tests
+- `test/test_rust_helpers_integration.jl` - Rust helpers library integration tests
+- `test/test_docs_examples.jl` - Documentation examples validation tests
 
 ## Performance
 
@@ -492,18 +496,24 @@ MIT License (see LICENSE file)
 
 ### User Documentation
 
-- **[Tutorial](docs/TUTORIAL.md)** - Step-by-step guide to using LastCall.jl
+- **[Tutorial](docs/src/tutorial.md)** - Step-by-step guide to using LastCall.jl
   - Basic usage and type system
   - String handling and error handling
   - Ownership types and LLVM IR integration
   - Performance optimization tips
 
-- **[Examples](docs/EXAMPLES.md)** - Practical examples and use cases
+- **[Examples](docs/src/examples.md)** - Practical examples and use cases
   - Numerical computations
   - String processing
   - Data structures
   - Performance comparisons
   - Real-world examples
+
+- **[Generics Guide](docs/src/generics.md)** - Generics support and usage
+  - Generic function detection
+  - Automatic monomorphization
+  - Type parameter inference
+  - Caching of monomorphized instances
 
 - **[Performance Guide](docs/src/performance.md)** - Performance optimization guide (日本語)
   - Compilation caching
@@ -513,7 +523,7 @@ MIT License (see LICENSE file)
   - Benchmark results
   - Performance tuning tips
 
-- **[Troubleshooting Guide](docs/troubleshooting.md)** - Common issues and solutions (日本語)
+- **[Troubleshooting Guide](docs/src/troubleshooting.md)** - Common issues and solutions (日本語)
   - Installation and setup problems
   - Compilation errors
   - Runtime errors

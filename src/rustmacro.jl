@@ -62,20 +62,18 @@ function rust_impl_call(mod, expr, ret_type, source)
     args = expr.args[2:end]
 
     func_name_str = string(func_name)
-    escaped_args = map(esc, args)
+    escaped_args = [esc(arg) for arg in args]
 
     if ret_type === nothing
         # Dynamic dispatch based on argument types
-        return quote
-            lib_name = get_current_library()
-            _rust_call_dynamic(lib_name, $func_name_str, $(escaped_args...))
-        end
+        return Expr(:call, GlobalRef(LastCall, :_rust_call_dynamic),
+                    Expr(:call, GlobalRef(LastCall, :get_current_library)),
+                    func_name_str, escaped_args...)
     else
         # Static dispatch with known return type
-        return quote
-            lib_name = get_current_library()
-            _rust_call_typed(lib_name, $func_name_str, $(esc(ret_type)), $(escaped_args...))
-        end
+        return Expr(:call, GlobalRef(LastCall, :_rust_call_typed),
+                    Expr(:call, GlobalRef(LastCall, :get_current_library)),
+                    func_name_str, esc(ret_type), escaped_args...)
     end
 end
 
@@ -110,7 +108,7 @@ function rust_impl_qualified(mod, expr, source)
     escaped_args = map(esc, args)
 
     return quote
-        _rust_call_from_lib($lib_name_str, $func_name_str, $(escaped_args...))
+        $(GlobalRef(LastCall, :_rust_call_from_lib))($(lib_name_str), $(func_name_str), $(escaped_args...))
     end
 end
 
@@ -137,7 +135,7 @@ function _rust_call_dynamic(lib_name::String, func_name::String, args...)
         # Handle as generic function - monomorphize and call
         return call_generic_function(func_name, args...)
     end
-    
+
     # Regular function - use existing logic
     # Get function pointer
     func_ptr = get_function_pointer(lib_name, func_name)
@@ -196,7 +194,7 @@ macro rust_register(func_name, ret_type, arg_types...)
     arg_types_vec = collect(arg_types)
 
     return quote
-        lib_name = get_current_library()
-        register_function($func_name_str, lib_name, $(esc(ret_type)), Type[$(map(esc, arg_types_vec)...)])
+        lib_name = $(GlobalRef(LastCall, :get_current_library))()
+        $(GlobalRef(LastCall, :register_function))($(func_name_str), lib_name, $(esc(ret_type)), Type[$(map(esc, arg_types_vec)...)])
     end
 end

@@ -322,7 +322,7 @@ pub extern "C" fn calculate_hash(data: *const u8, len: usize) -> u64 {
 """
 
 # Usage
-data = b"hello world"
+data = Vector{UInt8}(b"hello world")
 ptr = pointer(data)
 hash_value = @rust calculate_hash(ptr, length(data))::UInt64
 println("Hash: $hash_value")
@@ -462,7 +462,7 @@ function compress_data(data::Vector{UInt8})
 end
 
 # Usage
-data = b"aaabbbcccddd"
+data = Vector{UInt8}(b"aaabbbcccddd")
 compressed = compress_data(data)
 println("Original: $(length(data)) bytes")
 println("Compressed: $(length(compressed)) bytes")

@@ -28,7 +28,7 @@ pub extern "C" fn add(a: i32, b: i32) -> i32 {
 """
 
 # Call the function
-result = @rust add(10i32, 20i32)
+result = @rust add(Int32(10), Int32(20))
 println("add(10, 20) = $result")
 println()
 
@@ -59,8 +59,8 @@ pub extern "C" fn divide(a: f64, b: f64) -> f64 {
 }
 """
 
-println("multiply(5, 7) = $(@rust multiply(5i32, 7i32))")
-println("subtract(20, 8) = $(@rust subtract(20i32, 8i32))")
+println("multiply(5, 7) = $(@rust multiply(Int32(5), Int32(7)))")
+println("subtract(20, 8) = $(@rust subtract(Int32(20), Int32(8)))")
 println("divide(10.0, 3.0) = $(@rust divide(10.0, 3.0))")
 println()
 
@@ -78,11 +78,11 @@ pub extern "C" fn square(x: i64) -> i64 {
 """
 
 # Type inference from arguments
-result1 = @rust square(5i64)
+result1 = @rust square(Int64(5))
 println("square(5) = $result1")
 
 # Explicit return type annotation
-result2 = @rust square(10i64)::Int64
+result2 = @rust square(Int64(10))::Int64
 println("square(10) = $result2")
 println()
 
@@ -124,27 +124,29 @@ pub extern "C" fn print_hello() {
 }
 """
 
-println("is_even(4) = $(@rust is_even(4i32))")
-println("is_even(5) = $(@rust is_even(5i32))")
+println("is_even(4) = $(@rust is_even(Int32(4)))")
+println("is_even(5) = $(@rust is_even(Int32(5)))")
 @rust print_hello()
 println("print_hello() called")
 println()
 
 # ============================================================================
-# Example 6: Using @irust for Inline Functions
+# Example 6: Using irust"" for Inline Rust Expressions
 # ============================================================================
-println("Example 6: Using @irust for Inline Functions")
+println("Example 6: Using irust\"\" for Inline Rust Expressions")
 println("-" ^ 40)
 
-# @irust allows defining and calling functions in one step
-result = @irust("""
+# irust"" allows inline Rust expressions (simple expressions only)
+# For complete functions, use rust"" followed by @rust
+rust"""
 #[no_mangle]
 pub extern "C" fn compute(x: i32, y: i32) -> i32 {
     x * y + 10
 }
-""", 5i32, 3i32)
+"""
 
-println("@irust compute(5, 3) = $result")
+result = @rust compute(Int32(5), Int32(3))
+println("compute(5, 3) = $result")
 println()
 
 # ============================================================================
