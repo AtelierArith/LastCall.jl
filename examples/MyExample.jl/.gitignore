@@ -16,3 +16,5 @@ docs/site/
 # OS
 .DS_Store
 Thumbs.db
+
+*.log

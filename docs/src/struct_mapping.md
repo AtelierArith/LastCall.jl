@@ -210,44 +210,10 @@ println(pair_float.first)   # => 3.14
 println(pair_float.second)  # => 2.71
 ```
 
+
 ## Memory Management
 
-Structs created with `#[derive(JuliaStruct)]` are automatically managed:
-
-- **Automatic cleanup**: Finalizers call Rust's `Drop` implementation
-- **Safe memory**: No manual memory management required
-- **Reference counting**: For `Rc` and `Arc` types, reference counting is handled automatically
-
-```@example struct_mapping
-rust"""
-#[derive(JuliaStruct)]
-pub struct Resource {
-    id: i32,
-    data: Vec<u8>,
-}
-
-impl Resource {
-    pub fn new(id: i32, data: Vec<u8>) -> Self {
-        Resource { id, data }
-    }
-}
-
-impl Drop for Resource {
-    fn drop(&mut self) {
-        println!("Dropping resource {}", self.id);
-    }
-}
-"""
-
-# Resource is automatically cleaned up when it goes out of scope
-function use_resource()
-    res = Resource(1, [1, 2, 3])
-    # ... use resource ...
-    # Drop is automatically called when res goes out of scope
-end
-
-use_resource()  # Prints: "Dropping resource 1"
-```
+Structs created with `#[derive(JuliaStruct)]` are automatically managed by Julia's garbage collector. When a Julia object is reclaimed, its corresponding Rust memory is automatically freed.
 
 ## Method Binding
 

@@ -52,26 +52,28 @@ end
 Get a function pointer from a loaded library.
 """
 function get_function_pointer(lib_name::String, func_name::String)
-    if !haskey(RUST_LIBRARIES, lib_name)
-        error("Library '$lib_name' not found")
+    lock(REGISTRY_LOCK) do
+        if !haskey(RUST_LIBRARIES, lib_name)
+            error("Library '$lib_name' not found")
+        end
+
+        lib_handle, func_cache = RUST_LIBRARIES[lib_name]
+
+        # Check cache first
+        if haskey(func_cache, func_name)
+            return func_cache[func_name]
+        end
+
+        # Look up the function
+        func_ptr = Libdl.dlsym(lib_handle, func_name; throw_error=false)
+        if func_ptr === nothing || func_ptr == C_NULL
+            error("Function '$func_name' not found in library '$lib_name'")
+        end
+
+        # Cache it
+        func_cache[func_name] = func_ptr
+        return func_ptr
     end
-
-    lib_handle, func_cache = RUST_LIBRARIES[lib_name]
-
-    # Check cache first
-    if haskey(func_cache, func_name)
-        return func_cache[func_name]
-    end
-
-    # Look up the function
-    func_ptr = Libdl.dlsym(lib_handle, func_name; throw_error=false)
-    if func_ptr === nothing || func_ptr == C_NULL
-        error("Function '$func_name' not found in library '$lib_name'")
-    end
-
-    # Cache it
-    func_cache[func_name] = func_ptr
-    return func_ptr
 end
 
 """
@@ -172,17 +174,19 @@ function _compile_and_load_rust(code::String, source_file::String, source_line::
     lib_name = "rust_$(string(code_hash, base=16))"
 
     # Check if already compiled and loaded in memory
-    if haskey(RUST_LIBRARIES, lib_name)
-        CURRENT_LIB[] = lib_name
+    lock(REGISTRY_LOCK) do
+        if haskey(RUST_LIBRARIES, lib_name)
+            CURRENT_LIB[] = lib_name
 
-        # Ensure generic functions are registered (dictionary is volatile)
-        try
-            _detect_and_register_generic_functions(wrapped_code, lib_name)
-        catch e
-            @debug "Failed to register generic functions from memory: $e"
+            # Ensure generic functions are registered (dictionary is volatile)
+            try
+                _detect_and_register_generic_functions(wrapped_code, lib_name)
+            catch e
+                @debug "Failed to register generic functions from memory: $e"
+            end
+
+            return lib_name
         end
-
-        return lib_name
     end
 
     # Check cache first
@@ -192,17 +196,19 @@ function _compile_and_load_rust(code::String, source_file::String, source_line::
         lib_handle, _ = load_cached_library(cache_key)
 
         # Register the library
-        RUST_LIBRARIES[lib_name] = (lib_handle, Dict{String, Ptr{Cvoid}}())
-        CURRENT_LIB[] = lib_name
+        lock(REGISTRY_LOCK) do
+            RUST_LIBRARIES[lib_name] = (lib_handle, Dict{String, Ptr{Cvoid}}())
+            CURRENT_LIB[] = lib_name
 
-        # Try to load cached LLVM IR if available
-        cached_ir = get_cached_llvm_ir(cache_key)
-        if cached_ir !== nothing
-            try
-                rust_mod = load_llvm_ir(cached_ir; source_code=wrapped_code)
-                RUST_MODULE_REGISTRY[code_hash] = rust_mod
-            catch e
-                @debug "Failed to load cached LLVM IR: $e"
+            # Try to load cached LLVM IR if available
+            cached_ir = get_cached_llvm_ir(cache_key)
+            if cached_ir !== nothing
+                try
+                    rust_mod = load_llvm_ir(cached_ir; source_code=wrapped_code)
+                    RUST_MODULE_REGISTRY[code_hash] = rust_mod
+                catch e
+                    @debug "Failed to load cached LLVM IR: $e"
+                end
             end
         end
 
@@ -245,8 +251,10 @@ function _compile_and_load_rust(code::String, source_file::String, source_line::
     end
 
     # Register the library
-    RUST_LIBRARIES[lib_name] = (lib_handle, Dict{String, Ptr{Cvoid}}())
-    CURRENT_LIB[] = lib_name
+    lock(REGISTRY_LOCK) do
+        RUST_LIBRARIES[lib_name] = (lib_handle, Dict{String, Ptr{Cvoid}}())
+        CURRENT_LIB[] = lib_name
+    end
 
     # Also try to load LLVM IR for analysis (optional)
     try

@@ -29,6 +29,9 @@ module LastCall
 using LLVM
 using Libdl
 
+# Thread-safety lock for global registries and LLVM operations
+const REGISTRY_LOCK = ReentrantLock()
+
 # Include submodules in order of dependency
 include("types.jl")
 include("typetranslation.jl")

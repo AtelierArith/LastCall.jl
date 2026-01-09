@@ -89,18 +89,15 @@ function rust_impl_call(mod, expr, ret_type, source)
     func_name_str = string(func_name)
     escaped_args = [esc(arg) for arg in args]
 
-    # Capture the active library name for the module at macro expansion time
-    active_lib = get(MODULE_ACTIVE_LIB, mod, "")
-
     if ret_type === nothing
         # Dynamic dispatch based on argument types
         return Expr(:call, GlobalRef(LastCall, :_rust_call_dynamic),
-                    Expr(:call, GlobalRef(LastCall, :_resolve_lib), mod, active_lib),
+                    Expr(:call, GlobalRef(LastCall, :_resolve_lib), mod, ""),
                     func_name_str, escaped_args...)
     else
         # Static dispatch with known return type
         return Expr(:call, GlobalRef(LastCall, :_rust_call_typed),
-                    Expr(:call, GlobalRef(LastCall, :_resolve_lib), mod, active_lib),
+                    Expr(:call, GlobalRef(LastCall, :_resolve_lib), mod, ""),
                     func_name_str, esc(ret_type), escaped_args...)
     end
 end
