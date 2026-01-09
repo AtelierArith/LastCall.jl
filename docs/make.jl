@@ -10,7 +10,7 @@ makedocs(
         canonical = "https://atelierarith.github.io/LastCall.jl",
         assets = String[],
         edit_link = :commit,
-        size_threshold = 500,  # Increase threshold for large API documentation (in KiB)
+        size_threshold = 512000,  # Increase threshold for large API documentation (500 KiB in bytes)
     ),
     warnonly = [:missing_docs],
     pages = [
