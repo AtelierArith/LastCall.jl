@@ -18,6 +18,11 @@ Current active library name.
 const CURRENT_LIB = Ref{String}("")
 
 """
+Active library for each module during macro expansion.
+"""
+const MODULE_ACTIVE_LIB = Dict{Module, String}()
+
+"""
     get_current_library() -> String
 
 Get the name of the currently active Rust library.
@@ -90,9 +95,41 @@ macro rust_str(code)
     julia_defs = [emit_julia_definitions(info) for info in struct_infos]
 
     return quote
-        _compile_and_load_rust($(esc(code)), $(string(__source__.file)), $(__source__.line))
+        lib_name = _compile_and_load_rust($(esc(code)), $(string(__source__.file)), $(__source__.line))
+
+        # Store library information in the calling module for precompilation support
+        if !isdefined($__module__, :__LASTCALL_LIBS)
+            # Use Core.eval to define the constant if it doesn't exist
+            # Note: We use a Dict to support multiple blocks
+            @eval $__module__ const __LASTCALL_LIBS = Dict{String, String}()
+        end
+        $__module__.__LASTCALL_LIBS[lib_name] = $(esc(code))
+
+        # Track the "current" library for this module
+        if !isdefined($__module__, :__LASTCALL_ACTIVE_LIB)
+            @eval $__module__ __LASTCALL_ACTIVE_LIB = ""
+        end
+        $__module__.__LASTCALL_ACTIVE_LIB = lib_name
+
+        # Track active library for macro expansion in this session
+        MODULE_ACTIVE_LIB[$__module__] = lib_name
+
         $(julia_defs...)
+        lib_name
     end
+end
+
+"""
+    ensure_loaded(lib_name::String, code::String)
+
+Ensure that a Rust library is loaded in the current session.
+Useful for precompiled modules that need to reload libraries at runtime.
+"""
+function ensure_loaded(lib_name::String, code::String)
+    if !haskey(RUST_LIBRARIES, lib_name)
+        _compile_and_load_rust(code, "reload", 0)
+    end
+    return nothing
 end
 
 """
@@ -112,11 +149,11 @@ function _compile_and_load_rust(code::String, source_file::String, source_line::
 
     # Phase 4: Detect structs and generate wrappers
     struct_infos = parse_structs_and_impls(code)
-    
+
     # Remove #[derive(JuliaStruct)] attributes from code before compilation
     # (JuliaStruct is not a real Rust macro, so it would cause compilation errors)
     cleaned_code = remove_derive_julia_struct_attributes(code)
-    
+
     augmented_code = cleaned_code
     for info in struct_infos
         augmented_code *= generate_struct_wrappers(info)
@@ -145,18 +182,18 @@ function _compile_and_load_rust(code::String, source_file::String, source_line::
             @debug "Failed to register generic functions from memory: $e"
         end
 
-        return nothing
+        return lib_name
     end
 
     # Check cache first
     cached_lib = get_cached_library(cache_key)
     if cached_lib !== nothing && is_cache_valid(cache_key, wrapped_code, compiler)
         # Load from cache
-        lib_handle, cached_lib_name = load_cached_library(cache_key)
+        lib_handle, _ = load_cached_library(cache_key)
 
         # Register the library
-        RUST_LIBRARIES[cached_lib_name] = (lib_handle, Dict{String, Ptr{Cvoid}}())
-        CURRENT_LIB[] = cached_lib_name
+        RUST_LIBRARIES[lib_name] = (lib_handle, Dict{String, Ptr{Cvoid}}())
+        CURRENT_LIB[] = lib_name
 
         # Try to load cached LLVM IR if available
         cached_ir = get_cached_llvm_ir(cache_key)
@@ -171,12 +208,12 @@ function _compile_and_load_rust(code::String, source_file::String, source_line::
 
         # Try to detect and register generic functions from the cached code
         try
-            _detect_and_register_generic_functions(wrapped_code, cached_lib_name)
+            _detect_and_register_generic_functions(wrapped_code, lib_name)
         catch e
             @debug "Failed to detect generic functions from cache: $e"
         end
 
-        return nothing
+        return lib_name
     end
 
     # Compile to shared library (cache miss)
@@ -252,7 +289,7 @@ function _compile_and_load_rust(code::String, source_file::String, source_line::
         @debug "Failed to detect generic functions: $e"
     end
 
-    return nothing
+    return lib_name
 end
 
 """
@@ -300,10 +337,10 @@ function _compile_and_load_rust_with_cargo(code::String, source_file::String, so
 
     # Phase 4: Detect structs and generate wrappers
     struct_infos = parse_structs_and_impls(code)
-    
+
     # Remove #[derive(JuliaStruct)] attributes from code before compilation
     cleaned_code = remove_derive_julia_struct_attributes(code)
-    
+
     augmented_code = cleaned_code
     for info in struct_infos
         augmented_code *= generate_struct_wrappers(info)
@@ -330,7 +367,7 @@ function _compile_and_load_rust_with_cargo(code::String, source_file::String, so
             @debug "Failed to register generic functions from memory cache: $e"
         end
 
-        return nothing
+        return lib_name
     end
 
     cache_key_data = "$(code_hash)_$(deps_hash)_release"
@@ -353,7 +390,7 @@ function _compile_and_load_rust_with_cargo(code::String, source_file::String, so
                 @debug "Failed to register generic functions from disk cache: $e"
             end
 
-            return nothing
+            return lib_name
         end
     end
 
@@ -408,7 +445,7 @@ function _compile_and_load_rust_with_cargo(code::String, source_file::String, so
         end
     end
 
-    return nothing
+    return lib_name
 end
 
 

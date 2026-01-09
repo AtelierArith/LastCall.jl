@@ -89,17 +89,47 @@ function rust_impl_call(mod, expr, ret_type, source)
     func_name_str = string(func_name)
     escaped_args = [esc(arg) for arg in args]
 
+    # Capture the active library name for the module at macro expansion time
+    active_lib = get(MODULE_ACTIVE_LIB, mod, "")
+
     if ret_type === nothing
         # Dynamic dispatch based on argument types
         return Expr(:call, GlobalRef(LastCall, :_rust_call_dynamic),
-                    Expr(:call, GlobalRef(LastCall, :get_current_library)),
+                    Expr(:call, GlobalRef(LastCall, :_resolve_lib), mod, active_lib),
                     func_name_str, escaped_args...)
     else
         # Static dispatch with known return type
         return Expr(:call, GlobalRef(LastCall, :_rust_call_typed),
-                    Expr(:call, GlobalRef(LastCall, :get_current_library)),
+                    Expr(:call, GlobalRef(LastCall, :_resolve_lib), mod, active_lib),
                     func_name_str, esc(ret_type), escaped_args...)
     end
+end
+
+"""
+    _resolve_lib(mod::Module, lib_name::String)
+
+Resolve the actual library name to use, handling session-aware reloading for precompiled modules.
+"""
+function _resolve_lib(mod::Module, lib_name::String)
+    # If no library name specified (e.g. @rust func() without a prior rust"""..."""),
+    # try to use the module's active library.
+    if isempty(lib_name)
+        if isdefined(mod, :__LASTCALL_ACTIVE_LIB)
+            lib_name = getfield(mod, :__LASTCALL_ACTIVE_LIB)
+        else
+            return get_current_library()
+        end
+    end
+
+    # Ensure the library is loaded in this session if we have the code
+    if isdefined(mod, :__LASTCALL_LIBS)
+        libs = getfield(mod, :__LASTCALL_LIBS)
+        if haskey(libs, lib_name)
+            ensure_loaded(lib_name, libs[lib_name])
+        end
+    end
+
+    return lib_name
 end
 
 """
