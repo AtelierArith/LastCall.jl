@@ -105,17 +105,6 @@ pub extern "C" fn rust_rc_new_i64(value: i64) -> *mut c_void {
     Rc::into_raw(Rc::new(value)) as *mut c_void
 }
 
-/// Clone an Rc<T> (increment reference count)
-/// Note: This is generic and unsafe - type-specific versions should be preferred
-#[no_mangle]
-pub unsafe extern "C" fn rust_rc_clone(ptr: *mut c_void) -> *mut c_void {
-    if ptr.is_null() {
-        return std::ptr::null_mut();
-    }
-    // This is unsafe - we assume the pointer is valid Rc
-    // In practice, type-specific clone functions should be used
-    ptr
-}
 
 /// Clone an Rc<i32> (increment reference count)
 #[no_mangle]

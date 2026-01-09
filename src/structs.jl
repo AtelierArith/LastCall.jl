@@ -22,6 +22,7 @@ Represents a Rust struct and its associated implementation.
 """
 struct RustStructInfo
     name::String
+    type_params::Vector{String}
     methods::Vector{RustMethod}
 end
 
@@ -29,25 +30,37 @@ end
     parse_structs_and_impls(code::String) -> Vector{RustStructInfo}
 
 Heuristic parser to find pub structs and their impl blocks.
+Supports generics (e.g. `struct Point<T>`).
 """
 function parse_structs_and_impls(code::String)
     structs = Dict{String, RustStructInfo}()
 
-    # 1. Find all pub structs (only simple ones without generics for Phase 4)
-    # Pattern: pub struct Name { ... } but NOT pub struct Name<T> { ... }
-    # We look for name followed by { or ( to avoid generics <...>
-    struct_pattern = r"pub\s+struct\s+([A-Z]\w*)\s*(?:\{|\()"
+    # 1. Find all pub structs
+    # Pattern: pub struct Name<T> { ... }
+    # Capture 1: Name, Capture 2: Generics (optional)
+    struct_pattern = r"pub\s+struct\s+([A-Z]\w*)\s*(?:<(.+?)>)?\s*(?:\{|\()"
     for m in eachmatch(struct_pattern, code)
         name = String(m.captures[1])
+        params_str = m.captures[2]
+
+        type_params = String[]
+        if params_str !== nothing
+            # split T, U, ...
+            for p in split(params_str, ',')
+                push!(type_params, strip(p))
+            end
+        end
+
         if !haskey(structs, name)
-            structs[name] = RustStructInfo(name, RustMethod[])
+            structs[name] = RustStructInfo(name, type_params, RustMethod[])
         end
     end
 
     # 2. Find impl blocks
-    # Pattern: impl Name { ... }
-    # This is a bit tricky with regex, so we'll look for blocks
-    impl_pattern = r"impl\s+([A-Z]\w*)\s*\{([\s\S]*?)\n\}"
+    # Pattern: impl<T> Name<T> { ... } or impl Name { ... }
+    # We relax the matching to find the struct name.
+    # Regex: impl (optional generic decl) Name (optional generic args) { body }
+    impl_pattern = r"impl(?:\s*<.*?>)?\s+([A-Z]\w*)(?:\s*<.*?>)?\s*\{([\s\S]*?)\n\}"
     for m in eachmatch(impl_pattern, code)
         struct_name = String(m.captures[1])
         impl_body = m.captures[2]
@@ -70,8 +83,7 @@ function parse_methods_in_impl(impl_body::AbstractString)
     methods = RustMethod[]
 
     # Pattern: pub fn name(args) -> ret {
-    # Handles: &self, &mut self, self, and static methods
-    fn_pattern = r"pub\s+fn\s+(\w+)\s*\(([\s\S]*?)\)(?:\s*->\s*([\w:<>, ]+))?\s*\{"
+    fn_pattern = r"pub\s+fn\s+(\w+)\s*\(([\s\S]*?)\)(?:\s*->\s*([\w:<>, \[\]]+))?\s*(?:where[\s\S]*?)?\{"
 
     for m in eachmatch(fn_pattern, impl_body)
         name = String(m.captures[1])
@@ -81,28 +93,52 @@ function parse_methods_in_impl(impl_body::AbstractString)
         is_static = !occursin("self", args_str)
         is_mutable = occursin("&mut self", args_str)
 
-        # Simple arg parsing (ignoring self)
         arg_names = String[]
         arg_types = String[]
 
-        for arg in split(args_str, ',')
-            arg = strip(arg)
-            if isempty(arg) || arg == "self" || arg == "&self" || arg == "&mut self"
-                continue
-            end
+        # Quick argument parsing (improved to handle generics slightly better)
+        # Note: This simple comma split fails on nested generics like Vec<T, U>.
+        # For Phase 4 prototype, we assume simple types or wait for a real parser.
+        current_arg = ""
+        bracket_level = 0
 
-            # Pattern: name: type
-            if occursin(':', arg)
-                parts = split(arg, ':')
-                push!(arg_names, strip(parts[1]))
-                push!(arg_types, strip(parts[2]))
+        for char in args_str
+            if char == '<' || char == '(' || char == '['
+                bracket_level += 1
+                current_arg *= char
+            elseif char == '>' || char == ')' || char == ']'
+                bracket_level -= 1
+                current_arg *= char
+            elseif char == ',' && bracket_level == 0
+                # End of argument
+                _process_arg!(arg_names, arg_types, strip(current_arg))
+                current_arg = ""
+            else
+                current_arg *= char
             end
+        end
+        if !isempty(strip(current_arg))
+            _process_arg!(arg_names, arg_types, strip(current_arg))
         end
 
         push!(methods, RustMethod(name, is_static, is_mutable, arg_names, arg_types, ret_type))
     end
 
     return methods
+end
+
+function _process_arg!(names, types, arg)
+    if isempty(arg) || arg == "self" || arg == "&self" || arg == "&mut self"
+        return
+    end
+    if occursin(':', arg)
+        # Handle "name: type"
+        # Be careful not to split on type bounds like T: Display
+        # But args usually don't have bounds.
+        parts = split(arg, ':', limit=2)
+        push!(names, strip(parts[1]))
+        push!(types, strip(parts[2]))
+    end
 end
 
 """
