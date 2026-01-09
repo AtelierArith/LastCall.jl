@@ -716,11 +716,8 @@ function emit_julia_definitions(info::RustStructInfo)
                     return call_rust_function(func_ptr, field_type, self.ptr)
                 # Check if it's a method
                 elseif field in method_names_set
-                    # Return a function that calls the method
-                    method_func = getfield(self, field)
-                    return function(method_args...)
-                        return method_func(self, method_args...)
-                    end
+                    # Return the method directly - Julia will handle p.method() syntax
+                    return getfield(self, field)
                 else
                     return getfield(self, field)
                 end
