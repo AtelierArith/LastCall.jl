@@ -687,40 +687,50 @@ function emit_julia_definitions(info::RustStructInfo)
 
     # 3. Add field accessors if derive(JuliaStruct) is present
     if info.has_derive_julia_struct && !isempty(info.fields)
+        # Build field accessor mappings
+        field_getters = Dict{Symbol, Tuple{String, Symbol}}()
+        field_setters = Dict{Symbol, String}()
+        
         for (field_name, field_type) in info.fields
-            field_sym = esc(Symbol(field_name))
+            field_sym = Symbol(field_name)
             jl_field_type = rust_to_julia_type_sym(field_type)
             getter_name = struct_name_str * "_get_" * field_name
             setter_name = struct_name_str * "_set_" * field_name
-
-            # Getter
-            push!(exprs, quote
-                function Base.getproperty(self::$esc_struct, field::Symbol)
-                    if field === $(QuoteNode(Symbol(field_name)))
-                        lib = self.lib_name
-                        func_ptr = get_function_pointer(lib, $getter_name)
-                        field_type = julia_sym_to_type($(QuoteNode(jl_field_type)))
-                        return call_rust_function(func_ptr, field_type, self.ptr)
-                    else
-                        return getfield(self, field)
-                    end
-                end
-            end)
-
-            # Setter
-            push!(exprs, quote
-                function Base.setproperty!(self::$esc_struct, field::Symbol, value)
-                    if field === $(QuoteNode(Symbol(field_name)))
-                        lib = self.lib_name
-                        func_ptr = get_function_pointer(lib, $setter_name)
-                        call_rust_function(func_ptr, Cvoid, self.ptr, value)
-                        return value
-                    else
-                        return setfield!(self, field, value)
-                    end
-                end
-            end)
+            field_getters[field_sym] = (getter_name, jl_field_type)
+            field_setters[field_sym] = setter_name
         end
+        
+        # Single Base.getproperty for all fields
+        push!(exprs, quote
+            function Base.getproperty(self::$esc_struct, field::Symbol)
+                field_info = $(QuoteNode(field_getters))
+                if haskey(field_info, field)
+                    getter_name, jl_field_type_sym = field_info[field]
+                    lib = self.lib_name
+                    func_ptr = get_function_pointer(lib, getter_name)
+                    field_type = julia_sym_to_type(jl_field_type_sym)
+                    return call_rust_function(func_ptr, field_type, self.ptr)
+                else
+                    return getfield(self, field)
+                end
+            end
+        end)
+        
+        # Single Base.setproperty! for all fields
+        push!(exprs, quote
+            function Base.setproperty!(self::$esc_struct, field::Symbol, value)
+                field_setters_map = $(QuoteNode(field_setters))
+                if haskey(field_setters_map, field)
+                    setter_name = field_setters_map[field]
+                    lib = self.lib_name
+                    func_ptr = get_function_pointer(lib, setter_name)
+                    call_rust_function(func_ptr, Cvoid, self.ptr, value)
+                    return value
+                else
+                    return setfield!(self, field, value)
+                end
+            end
+        end)
     end
 
     # 4. Add trait implementations if requested
