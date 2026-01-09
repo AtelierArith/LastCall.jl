@@ -434,6 +434,6 @@ clear_cache()
 
 ## Next Steps
 
-- See [Examples](@ref) for more advanced usage examples
-- Check [Troubleshooting](@ref) to solve problems
-- Review [API Reference](@ref api.md) for all features
+- See [Examples](@ref "Examples") for more advanced usage examples
+- Check [Troubleshooting](@ref "Troubleshooting") to solve problems
+- Review [API Reference](@ref "API Reference") for all features

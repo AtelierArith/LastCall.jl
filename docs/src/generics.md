@@ -233,6 +233,6 @@ This ensures that calling the same generic function with the same types reuses t
 
 ## See Also
 
-- [Tutorial](@ref tutorial.md) - General tutorial
-- [Examples](@ref) - More examples
+- [Tutorial](@ref "Tutorial") - General tutorial
+- [Examples](@ref "Examples") - More examples
 - `test/test_generics.jl` - Test suite with examples
