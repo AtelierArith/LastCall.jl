@@ -1,6 +1,12 @@
 using LastCall
 using Test
 
+# Include cache tests
+include("test_cache.jl")
+
+# Include ownership tests
+include("test_ownership.jl")
+
 @testset "LastCall.jl" begin
 
     @testset "Type Mappings" begin

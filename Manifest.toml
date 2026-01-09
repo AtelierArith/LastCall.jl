@@ -2,7 +2,7 @@
 
 julia_version = "1.12.4"
 manifest_format = "2.0"
-project_hash = "1230db9534988cfc4e717bb4c71a4041df9e8651"
+project_hash = "8411e26745b40b51e774733ac7133dd4cbd1b445"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -70,7 +70,7 @@ uuid = "dad2f222-ce93-54a1-a47d-0025e8a3acab"
 version = "0.0.38+0"
 
 [[deps.LastCall]]
-deps = ["LLVM", "Libdl"]
+deps = ["Dates", "LLVM", "Libdl", "SHA"]
 path = "."
 uuid = "84591b13-8127-4a16-8156-1f71d7525150"
 version = "0.1.0"

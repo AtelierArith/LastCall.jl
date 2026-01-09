@@ -94,24 +94,71 @@ end
     _compile_and_load_rust(code::String, source_file::String, source_line::Int)
 
 Internal function to compile Rust code and load the resulting shared library.
+Uses caching to avoid recompilation when possible.
 """
 function _compile_and_load_rust(code::String, source_file::String, source_line::Int)
     # Wrap the code if needed
     wrapped_code = wrap_rust_code(code)
 
+    # Generate cache key
+    compiler = get_default_compiler()
+    cache_key = generate_cache_key(wrapped_code, compiler)
+    
     # Generate a unique library name based on the code hash
     code_hash = hash(wrapped_code)
     lib_name = "rust_$(string(code_hash, base=16))"
 
-    # Check if already compiled and loaded
+    # Check if already compiled and loaded in memory
     if haskey(RUST_LIBRARIES, lib_name)
         CURRENT_LIB[] = lib_name
         return nothing
     end
 
-    # Compile to shared library
-    compiler = get_default_compiler()
+    # Check cache first
+    cached_lib = get_cached_library(cache_key)
+    if cached_lib !== nothing && is_cache_valid(cache_key, wrapped_code, compiler)
+        # Load from cache
+        lib_handle, cached_lib_name = load_cached_library(cache_key)
+        
+        # Register the library
+        RUST_LIBRARIES[cached_lib_name] = (lib_handle, Dict{String, Ptr{Cvoid}}())
+        CURRENT_LIB[] = cached_lib_name
+        
+        # Try to load cached LLVM IR if available
+        cached_ir = get_cached_llvm_ir(cache_key)
+        if cached_ir !== nothing
+            try
+                rust_mod = load_llvm_ir(cached_ir; source_code=wrapped_code)
+                RUST_MODULE_REGISTRY[code_hash] = rust_mod
+            catch e
+                @debug "Failed to load cached LLVM IR: $e"
+            end
+        end
+        
+        return nothing
+    end
+
+    # Compile to shared library (cache miss)
     lib_path = compile_rust_to_shared_lib(wrapped_code; compiler=compiler)
+
+    # Save to cache
+    try
+        # Extract function names for metadata (simplified - we'll get them from LLVM IR if available)
+        functions = String[]  # Will be populated if LLVM IR is available
+        
+        metadata = CacheMetadata(
+            cache_key,
+            code_hash,
+            "$(compiler.optimization_level)_$(compiler.emit_debug_info)",
+            compiler.target_triple,
+            now(),
+            functions
+        )
+        
+        save_cached_library(cache_key, lib_path, metadata)
+    catch e
+        @warn "Failed to save library to cache: $e"
+    end
 
     # Load the library
     lib_handle = Libdl.dlopen(lib_path, Libdl.RTLD_GLOBAL | Libdl.RTLD_NOW)
@@ -126,8 +173,32 @@ function _compile_and_load_rust(code::String, source_file::String, source_line::
     # Also try to load LLVM IR for analysis (optional)
     try
         ir_path = compile_rust_to_llvm_ir(wrapped_code; compiler=compiler)
+        
+        # Cache the LLVM IR
+        try
+            save_cached_llvm_ir(cache_key, ir_path)
+        catch e
+            @debug "Failed to cache LLVM IR: $e"
+        end
+        
         rust_mod = load_llvm_ir(ir_path; source_code=wrapped_code)
         RUST_MODULE_REGISTRY[code_hash] = rust_mod
+        
+        # Update metadata with function list
+        try
+            functions = list_functions(rust_mod)
+            metadata = CacheMetadata(
+                cache_key,
+                code_hash,
+                "$(compiler.optimization_level)_$(compiler.emit_debug_info)",
+                compiler.target_triple,
+                now(),
+                functions
+            )
+            save_cache_metadata(cache_key, metadata)
+        catch e
+            @debug "Failed to update cache metadata: $e"
+        end
     catch e
         # LLVM IR loading is optional, don't fail if it doesn't work
         @debug "Failed to load LLVM IR for analysis: $e"

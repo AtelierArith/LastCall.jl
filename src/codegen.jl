@@ -85,177 +85,117 @@ function julia_to_c_type(t::Type)
     end
 end
 
-# Specialized call functions for common type combinations
-# Using concrete types and literal tuple syntax to satisfy ccall's requirements
+ccall_return_type(::Type{Cvoid}) = Cvoid
+ccall_return_type(::Type{Nothing}) = Cvoid
+ccall_return_type(::Type{Cstring}) = Cstring
+ccall_return_type(::Type{String}) = Cstring
+ccall_return_type(::Type{T}) where {T} = T
 
-# Int32 functions
-_call_rust_i32_0(ptr::Ptr{Cvoid}) = ccall(ptr, Int32, ())
-_call_rust_i32_1(ptr::Ptr{Cvoid}, a1::Int32) = ccall(ptr, Int32, (Int32,), a1)
-_call_rust_i32_2(ptr::Ptr{Cvoid}, a1::Int32, a2::Int32) = ccall(ptr, Int32, (Int32, Int32), a1, a2)
-_call_rust_i32_3(ptr::Ptr{Cvoid}, a1::Int32, a2::Int32, a3::Int32) = ccall(ptr, Int32, (Int32, Int32, Int32), a1, a2, a3)
+convert_return(::Type{Cvoid}, _) = nothing
+convert_return(::Type{Nothing}, _) = nothing
+convert_return(::Type{Cstring}, value) = cstring_to_julia_string(value)
+convert_return(::Type{String}, value) = cstring_to_julia_string(value)
+convert_return(::Type{T}, value) where {T} = value
 
-# Int64 functions
-_call_rust_i64_0(ptr::Ptr{Cvoid}) = ccall(ptr, Int64, ())
-_call_rust_i64_1(ptr::Ptr{Cvoid}, a1::Int64) = ccall(ptr, Int64, (Int64,), a1)
-_call_rust_i64_2(ptr::Ptr{Cvoid}, a1::Int64, a2::Int64) = ccall(ptr, Int64, (Int64, Int64), a1, a2)
-_call_rust_i64_3(ptr::Ptr{Cvoid}, a1::Int64, a2::Int64, a3::Int64) = ccall(ptr, Int64, (Int64, Int64, Int64), a1, a2, a3)
+default_numeric_arg_type(::Type{Bool}) = Int32
+default_numeric_arg_type(::Type{UInt32}) = Int32
+default_numeric_arg_type(::Type{Cstring}) = Int32
+default_numeric_arg_type(::Type{String}) = Int32
+default_numeric_arg_type(::Type{Cvoid}) = Int64
+default_numeric_arg_type(::Type{Nothing}) = Int64
+default_numeric_arg_type(::Type{T}) where {T} = T
 
-# Float32 functions
-_call_rust_f32_0(ptr::Ptr{Cvoid}) = ccall(ptr, Float32, ())
-_call_rust_f32_1(ptr::Ptr{Cvoid}, a1::Float32) = ccall(ptr, Float32, (Float32,), a1)
-_call_rust_f32_2(ptr::Ptr{Cvoid}, a1::Float32, a2::Float32) = ccall(ptr, Float32, (Float32, Float32), a1, a2)
-_call_rust_f32_3(ptr::Ptr{Cvoid}, a1::Float32, a2::Float32, a3::Float32) = ccall(ptr, Float32, (Float32, Float32, Float32), a1, a2, a3)
+normalize_arg_type(::Type{R}, ::Type{T}) where {R,T} = T
+normalize_arg_type(::Type{R}, ::Type{T}) where {R,T<:AbstractString} = String
+normalize_arg_type(::Type{R}, ::Type{Cstring}) where {R} = Cstring
+normalize_arg_type(::Type{R}, ::Type{T}) where {R,T<:Integer} = default_numeric_arg_type(R)
+normalize_arg_type(::Type{R}, ::Type{T}) where {R,T<:AbstractFloat} = default_numeric_arg_type(R)
 
-# Float64 functions
-_call_rust_f64_0(ptr::Ptr{Cvoid}) = ccall(ptr, Float64, ())
-_call_rust_f64_1(ptr::Ptr{Cvoid}, a1::Float64) = ccall(ptr, Float64, (Float64,), a1)
-_call_rust_f64_2(ptr::Ptr{Cvoid}, a1::Float64, a2::Float64) = ccall(ptr, Float64, (Float64, Float64), a1, a2)
-_call_rust_f64_3(ptr::Ptr{Cvoid}, a1::Float64, a2::Float64, a3::Float64) = ccall(ptr, Float64, (Float64, Float64, Float64), a1, a2, a3)
+function normalize_arg_types(::Type{R}, argt::Type{<:Tuple}) where {R}
+    normalized = map(t -> normalize_arg_type(R, t), argt.parameters)
+    return Core.apply_type(Tuple, normalized...)
+end
 
-# Bool functions
-_call_rust_bool_0(ptr::Ptr{Cvoid}) = ccall(ptr, Bool, ())
-_call_rust_bool_1(ptr::Ptr{Cvoid}, a1::Int32) = ccall(ptr, Bool, (Int32,), a1)
-_call_rust_bool_2(ptr::Ptr{Cvoid}, a1::Int32, a2::Int32) = ccall(ptr, Bool, (Int32, Int32), a1, a2)
+is_supported_arg_type(::Type{T}) where {T} = T <: Integer ||
+    T <: AbstractFloat ||
+    T == Bool ||
+    T <: Ptr ||
+    T <: Ref ||
+    T <: AbstractString ||
+    T == Cstring
 
-# UInt32 functions
-_call_rust_u32_0(ptr::Ptr{Cvoid}) = ccall(ptr, UInt32, ())
-_call_rust_u32_1_str(ptr::Ptr{Cvoid}, a1::String) = ccall(ptr, UInt32, (Cstring,), a1)
-_call_rust_u32_1_i32(ptr::Ptr{Cvoid}, a1::Int32) = ccall(ptr, UInt32, (Int32,), a1)
-_call_rust_u32_2_str(ptr::Ptr{Cvoid}, a1::String, a2::String) = ccall(ptr, UInt32, (Cstring, Cstring), a1, a2)
+is_supported_return_type(::Type{T}) where {T} = T <: Integer ||
+    T <: AbstractFloat ||
+    T == Bool ||
+    T == Cvoid ||
+    T == Nothing ||
+    T == String ||
+    T == Cstring ||
+    T <: Ptr
 
-# Void functions
-_call_rust_void_0(ptr::Ptr{Cvoid}) = ccall(ptr, Cvoid, ())
-_call_rust_void_1(ptr::Ptr{Cvoid}, a1::Int64) = ccall(ptr, Cvoid, (Int64,), a1)
-_call_rust_void_2(ptr::Ptr{Cvoid}, a1::Int64, a2::Int64) = ccall(ptr, Cvoid, (Int64, Int64), a1, a2)
+ccall_arg_type(::Type{T}) where {T<:AbstractString} = Cstring
+ccall_arg_type(::Type{Cstring}) = Cstring
+ccall_arg_type(::Type{T}) where {T<:Integer} = T
+ccall_arg_type(::Type{T}) where {T<:AbstractFloat} = T
+ccall_arg_type(::Type{Bool}) = Bool
+ccall_arg_type(::Type{Ptr{T}}) where {T} = Ptr{T}
+ccall_arg_type(::Type{Ref{T}}) where {T} = Ref{T}
 
-# Cstring (string) functions - use String and let ccall handle conversion
-_call_rust_cstring_0(ptr::Ptr{Cvoid}) = ccall(ptr, Cstring, ())
-_call_rust_cstring_1_str(ptr::Ptr{Cvoid}, a1::String) = ccall(ptr, Cstring, (Cstring,), a1)
-_call_rust_cstring_2_str(ptr::Ptr{Cvoid}, a1::String, a2::String) = ccall(ptr, Cstring, (Cstring, Cstring), a1, a2)
-_call_rust_cstring_1_i32(ptr::Ptr{Cvoid}, a1::Int32) = ccall(ptr, Cstring, (Int32,), a1)
-_call_rust_cstring_2_str_i32(ptr::Ptr{Cvoid}, a1::String, a2::Int32) = ccall(ptr, Cstring, (Cstring, Int32), a1, a2)
-_call_rust_cstring_2_i32_str(ptr::Ptr{Cvoid}, a1::Int32, a2::String) = ccall(ptr, Cstring, (Int32, Cstring), a1, a2)
+convert_arg(::Type{T}, x) where {T<:AbstractString} = julia_string_to_cstring(String(x))
+convert_arg(::Type{Cstring}, x) = x
+convert_arg(::Type{T}, x) where {T<:Integer} = convert(T, x)
+convert_arg(::Type{T}, x) where {T<:AbstractFloat} = convert(T, x)
+convert_arg(::Type{Bool}, x) = Bool(x)
+convert_arg(::Type{Ptr{T}}, x) where {T} = convert(Ptr{T}, x)
+convert_arg(::Type{Ref{T}}, x) where {T} = convert(Ref{T}, x)
+
+@generated function _call_rust_function(func_ptr::Ptr{Cvoid}, ::Type{R}, ::Type{A}, args...) where {R,A<:Tuple}
+    if !is_supported_return_type(R)
+        return :(error("Unsupported return type ($R). Use @rust_ccall for custom types."))
+    end
+    arg_types = A.parameters
+    for T in arg_types
+        if !is_supported_arg_type(T)
+            return :(error("Unsupported argument type ($T). Use @rust_ccall for custom types."))
+        end
+    end
+    ret_ccall = ccall_return_type(R)
+    ccall_arg_types = map(ccall_arg_type, arg_types)
+    arg_exprs = Any[]
+    for (i, T) in enumerate(arg_types)
+        push!(arg_exprs, :(convert_arg($T, args[$i])))
+    end
+    ccall_expr = Expr(:call, :ccall, :func_ptr, ret_ccall, Expr(:tuple, ccall_arg_types...), arg_exprs...)
+    if R == String || R == Cstring
+        return :(convert_return($R, $ccall_expr))
+    end
+    return ccall_expr
+end
 
 """
     call_rust_function(func_ptr::Ptr{Cvoid}, ret_type::Type, args...)
 
 Call a Rust function with the given return type.
-Dispatches to specialized ccall functions based on return type and argument count.
+Uses a generated ccall based on normalized argument types.
 """
 function call_rust_function(func_ptr::Ptr{Cvoid}, ret_type::Type, args...)
-    n = length(args)
+    argt = normalize_arg_types(ret_type, typeof(args))
+    return _call_rust_function(func_ptr, ret_type, argt, args...)
+end
 
-    # Dispatch based on return type and argument count
-    if ret_type == Int32 || ret_type <: Int32
-        if n == 0
-            return _call_rust_i32_0(func_ptr)
-        elseif n == 1
-            return _call_rust_i32_1(func_ptr, Int32(args[1]))
-        elseif n == 2
-            return _call_rust_i32_2(func_ptr, Int32(args[1]), Int32(args[2]))
-        elseif n == 3
-            return _call_rust_i32_3(func_ptr, Int32(args[1]), Int32(args[2]), Int32(args[3]))
-        end
-    elseif ret_type == Int64 || ret_type <: Int64
-        if n == 0
-            return _call_rust_i64_0(func_ptr)
-        elseif n == 1
-            return _call_rust_i64_1(func_ptr, Int64(args[1]))
-        elseif n == 2
-            return _call_rust_i64_2(func_ptr, Int64(args[1]), Int64(args[2]))
-        elseif n == 3
-            return _call_rust_i64_3(func_ptr, Int64(args[1]), Int64(args[2]), Int64(args[3]))
-        end
-    elseif ret_type == Float32 || ret_type <: Float32
-        if n == 0
-            return _call_rust_f32_0(func_ptr)
-        elseif n == 1
-            return _call_rust_f32_1(func_ptr, Float32(args[1]))
-        elseif n == 2
-            return _call_rust_f32_2(func_ptr, Float32(args[1]), Float32(args[2]))
-        elseif n == 3
-            return _call_rust_f32_3(func_ptr, Float32(args[1]), Float32(args[2]), Float32(args[3]))
-        end
-    elseif ret_type == Float64 || ret_type <: Float64
-        if n == 0
-            return _call_rust_f64_0(func_ptr)
-        elseif n == 1
-            return _call_rust_f64_1(func_ptr, Float64(args[1]))
-        elseif n == 2
-            return _call_rust_f64_2(func_ptr, Float64(args[1]), Float64(args[2]))
-        elseif n == 3
-            return _call_rust_f64_3(func_ptr, Float64(args[1]), Float64(args[2]), Float64(args[3]))
-        end
-    elseif ret_type == Bool
-        if n == 0
-            return _call_rust_bool_0(func_ptr)
-        elseif n == 1
-            return _call_rust_bool_1(func_ptr, Int32(args[1]))
-        elseif n == 2
-            return _call_rust_bool_2(func_ptr, Int32(args[1]), Int32(args[2]))
-        end
-    elseif ret_type == UInt32
-        if n == 0
-            return _call_rust_u32_0(func_ptr)
-        elseif n == 1
-            arg1 = args[1]
-            arg1_type = typeof(arg1)
-            if arg1_type == String
-                return _call_rust_u32_1_str(func_ptr, arg1)
-            else
-                return _call_rust_u32_1_i32(func_ptr, Int32(arg1))
-            end
-        elseif n == 2
-            arg1 = args[1]
-            arg2 = args[2]
-            if typeof(arg1) == String && typeof(arg2) == String
-                return _call_rust_u32_2_str(func_ptr, arg1, arg2)
-            end
-        end
-    elseif ret_type == Cvoid || ret_type == Nothing
-        if n == 0
-            return _call_rust_void_0(func_ptr)
-        elseif n == 1
-            return _call_rust_void_1(func_ptr, Int64(args[1]))
-        elseif n == 2
-            return _call_rust_void_2(func_ptr, Int64(args[1]), Int64(args[2]))
-        end
-    elseif ret_type == Cstring || ret_type == String
-        # Handle string return types
-        result = if n == 0
-            _call_rust_cstring_0(func_ptr)
-        elseif n == 1
-            arg1 = args[1]
-            if typeof(arg1) == String
-                _call_rust_cstring_1_str(func_ptr, arg1)
-            else
-                _call_rust_cstring_1_i32(func_ptr, Int32(arg1))
-            end
-        elseif n == 2
-            arg1, arg2 = args[1], args[2]
-            t1, t2 = typeof(arg1), typeof(arg2)
-            if t1 == String && t2 == String
-                _call_rust_cstring_2_str(func_ptr, arg1, arg2)
-            elseif t1 == String
-                _call_rust_cstring_2_str_i32(func_ptr, arg1, Int32(arg2))
-            elseif t2 == String
-                _call_rust_cstring_2_i32_str(func_ptr, Int32(arg1), arg2)
-            else
-                error("Unsupported argument types for Cstring return")
-            end
-        else
-            error("Unsupported argument count for Cstring return: $n")
-        end
-
-        # Convert Cstring to Julia String
-        if result == C_NULL || convert(Ptr{Cvoid}, result) == C_NULL
-            return ""
-        else
-            return unsafe_string(result)
-        end
+function call_rust_function(func_ptr::Ptr{Cvoid}, ret_type::Type, arg_types::Vector{Type}, args...)
+    if length(arg_types) != length(args)
+        error("Argument count mismatch: expected $(length(arg_types)), got $(length(args))")
     end
+    argt = Core.apply_type(Tuple, arg_types...)
+    return _call_rust_function(func_ptr, ret_type, argt, args...)
+end
 
-    error("Unsupported return type ($ret_type) or argument count ($n). Use @rust_ccall for custom types.")
+function call_rust_function(func_ptr::Ptr{Cvoid}, ret_type::Type, argt::Type{<:Tuple}, args...)
+    if length(argt.parameters) != length(args)
+        error("Argument count mismatch: expected $(length(argt.parameters)), got $(length(args))")
+    end
+    return _call_rust_function(func_ptr, ret_type, argt, args...)
 end
 
 """
@@ -265,7 +205,7 @@ Call a Rust function, inferring the return type from the first argument.
 """
 function call_rust_function_infer(func_ptr::Ptr{Cvoid}, args...)
     if isempty(args)
-        return _call_rust_void_0(func_ptr)
+        return call_rust_function(func_ptr, Cvoid)
     end
 
     first_type = typeof(first(args))

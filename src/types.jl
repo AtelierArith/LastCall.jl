@@ -304,10 +304,20 @@ mutable struct RustBox{T}
     function RustBox{T}(ptr::Ptr{Cvoid}) where {T}
         box = new{T}(ptr, false)
         # Attach finalizer for automatic cleanup
+        # The actual drop will be handled by memory.jl if available
         finalizer(box) do b
             if !b.dropped && b.ptr != C_NULL
-                # Note: Actual drop should be implemented by Rust side
-                b.dropped = true
+                # Try to call Rust drop function if memory.jl is loaded
+                try
+                    if isdefined(LastCall, :drop_rust_box)
+                        LastCall.drop_rust_box(b)
+                    else
+                        b.dropped = true
+                    end
+                catch e
+                    @warn "Error dropping RustBox in finalizer: $e"
+                    b.dropped = true
+                end
             end
         end
         return box
@@ -346,7 +356,16 @@ mutable struct RustRc{T}
         rc = new{T}(ptr, false)
         finalizer(rc) do r
             if !r.dropped && r.ptr != C_NULL
-                r.dropped = true
+                try
+                    if isdefined(LastCall, :drop_rust_rc)
+                        LastCall.drop_rust_rc(r)
+                    else
+                        r.dropped = true
+                    end
+                catch e
+                    @warn "Error dropping RustRc in finalizer: $e"
+                    r.dropped = true
+                end
             end
         end
         return rc
@@ -389,7 +408,16 @@ mutable struct RustArc{T}
         arc = new{T}(ptr, false)
         finalizer(arc) do a
             if !a.dropped && a.ptr != C_NULL
-                a.dropped = true
+                try
+                    if isdefined(LastCall, :drop_rust_arc)
+                        LastCall.drop_rust_arc(a)
+                    else
+                        a.dropped = true
+                    end
+                catch e
+                    @warn "Error dropping RustArc in finalizer: $e"
+                    a.dropped = true
+                end
             end
         end
         return arc
@@ -398,6 +426,10 @@ end
 
 Base.unsafe_convert(::Type{Ptr{Cvoid}}, a::RustArc) = a.ptr
 Base.cconvert(::Type{Ptr{Cvoid}}, a::RustArc) = a
+
+# is_valid for reference-counted types
+is_valid(rc::RustRc) = !rc.dropped && rc.ptr != C_NULL
+is_valid(arc::RustArc) = !arc.dropped && arc.ptr != C_NULL
 
 """
     RustVec{T}

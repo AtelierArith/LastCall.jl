@@ -256,6 +256,9 @@ function _rust_llvm_call(func_name::String, args...)
     # Use the cached function pointer for now
     # Direct llvmcall integration requires more complex setup
     if info.func_ptr !== nothing
+        if !isempty(info.arg_types)
+            return call_rust_function(info.func_ptr, info.return_type, info.arg_types, args...)
+        end
         return call_rust_function(info.func_ptr, info.return_type, args...)
     end
 
@@ -263,51 +266,30 @@ function _rust_llvm_call(func_name::String, args...)
 end
 
 # ============================================================================
-# Optimized generated functions for specific type combinations
+# Generated function wrappers for registered Rust calls
 # ============================================================================
 
 """
     @generated function rust_call_generated(::Val{name}, args...) where {name}
 
-A generated function that produces optimized code for Rust function calls.
+A generated function that emits a typed call for registered Rust functions.
 The function name is encoded as a type parameter for compile-time dispatch.
 """
 @generated function rust_call_generated(::Val{name}, args...) where {name}
     func_name = string(name)
-    arg_types = collect(args)
-    n = length(arg_types)
+    n = length(args)
 
     # Try to get function info at compile time
     info = get_registered_function(func_name)
 
     if info !== nothing && info.func_ptr !== nothing
-        # We have function info, generate optimized code
-        ret_type = info.return_type
         expected_arg_types = info.arg_types
-
-        # Validate argument count
-        if n != length(expected_arg_types)
-            return :(error("Argument count mismatch: expected $(length($expected_arg_types)), got $n"))
+        expected_len = length(expected_arg_types)
+        if n != expected_len
+            return :(error("Argument count mismatch: expected $expected_len, got $n"))
         end
-
-        # Generate ccall with exact types (most compatible approach)
-        func_ptr_val = info.func_ptr
-
-        if ret_type == Int32 && n == 2 && expected_arg_types == [Int32, Int32]
-            return :(ccall($func_ptr_val, Int32, (Int32, Int32),
-                         Int32(args[1]), Int32(args[2])))
-        elseif ret_type == Int64 && n == 2 && expected_arg_types == [Int64, Int64]
-            return :(ccall($func_ptr_val, Int64, (Int64, Int64),
-                         Int64(args[1]), Int64(args[2])))
-        elseif ret_type == Float64 && n == 2 && expected_arg_types == [Float64, Float64]
-            return :(ccall($func_ptr_val, Float64, (Float64, Float64),
-                         Float64(args[1]), Float64(args[2])))
-        elseif ret_type == Float32 && n == 2 && expected_arg_types == [Float32, Float32]
-            return :(ccall($func_ptr_val, Float32, (Float32, Float32),
-                         Float32(args[1]), Float32(args[2])))
-        elseif ret_type == Bool && n == 1
-            return :(ccall($func_ptr_val, Bool, (Int32,), Int32(args[1])))
-        end
+        argt = Core.apply_type(Tuple, expected_arg_types...)
+        return :(call_rust_function($(info.func_ptr), $(info.return_type), $argt, args...))
     end
 
     # Fallback to runtime dispatch

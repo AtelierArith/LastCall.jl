@@ -36,6 +36,8 @@ include("compiler.jl")
 include("llvmintegration.jl")
 include("codegen.jl")
 include("exceptions.jl")
+include("cache.jl")
+include("memory.jl")
 include("ruststr.jl")
 include("rustmacro.jl")
 
@@ -61,6 +63,10 @@ export RustFunctionInfo, compile_and_register_rust_function
 # Extended ownership types (Phase 2)
 export RustBox, RustRc, RustArc, RustVec, RustSlice
 export drop!, is_dropped, is_valid
+export clone  # For RustRc and RustArc
+
+# Caching (Phase 2)
+export clear_cache, get_cache_size, list_cached_libraries, cleanup_old_cache
 
 # Module initialization
 function __init__()
