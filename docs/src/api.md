@@ -238,11 +238,8 @@ MONOMORPHIZED_FUNCTIONS
 
 ### Testing and Debugging
 
-These functions are exported for testing purposes but are considered internal:
-
-```@docs
-_extract_error_line_numbers_impl
-```
+These functions are exported for testing purposes but are considered internal.
+They are wrappers around internal implementation functions.
 
 ## Internal Functions
 
@@ -252,12 +249,14 @@ They are documented here for completeness but should not be used directly by use
 ```@autodocs
 Modules = [LastCall]
 Filter = t -> !(t in [
-    # Exclude items already documented above
+    # Exclude items already documented in @docs blocks above
     RustResult, RustOption, RustBox, RustRc, RustArc, RustVec, RustSlice,
     RustPtr, RustRef, RustString, RustStr,
     RustError, CompilationError, RuntimeError, CargoBuildError, DependencyResolutionError,
     RustCompiler, OptimizationConfig, RustFunctionInfo,
     DependencySpec, CargoProject,
     GENERIC_FUNCTION_REGISTRY, MONOMORPHIZED_FUNCTIONS,
+    # Exclude functions without docstrings
+    _extract_error_line_numbers, _extract_suggestions,
 ])
 ```
