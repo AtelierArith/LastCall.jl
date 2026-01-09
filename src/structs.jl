@@ -455,14 +455,15 @@ function generate_struct_wrappers(info::RustStructInfo)
 
     # Generate field accessors if struct has fields and derive(JuliaStruct)
     if info.has_derive_julia_struct && !isempty(info.fields)
-        # Get set of method names to avoid conflicts
-        method_names = Set([m.name for m in info.methods])
+        # Get set of method wrapper names to avoid conflicts
+        # Method wrappers are named: struct_name_method_name
+        method_wrapper_names = Set(["$(struct_name)_$(m.name)" for m in info.methods])
         
         for (field_name, field_type) in info.fields
-            # Skip if there's a method with the same name as the field getter
+            # Skip if there's a method wrapper with the same name as the field getter
             getter_name = "$(struct_name)_get_$(field_name)"
-            if getter_name in method_names
-                continue  # Skip field accessor if method with same name exists
+            if getter_name in method_wrapper_names
+                continue  # Skip field accessor if method wrapper with same name exists
             end
             
             # Getter - need to clone String and Vec types
