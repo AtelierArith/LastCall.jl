@@ -313,6 +313,22 @@ Configure optimization passes:
 ```julia
 using LastCall
 
+# Compile Rust code to LLVM IR
+rust_code = """
+#[no_mangle]
+pub extern "C" fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+"""
+
+wrapped_code = LastCall.wrap_rust_code(rust_code)
+compiler = get_default_compiler()
+ir_path = LastCall.compile_rust_to_llvm_ir(wrapped_code; compiler=compiler)
+
+# Load the LLVM IR module
+rust_mod = LastCall.load_llvm_ir(ir_path; source_code=wrapped_code)
+llvm_mod = rust_mod.mod  # Get the LLVM.Module
+
 # Create optimization config
 config = OptimizationConfig(
     level=3,  # Optimization level 0-3
@@ -320,12 +336,12 @@ config = OptimizationConfig(
     inline_threshold=300
 )
 
-# Optimize a module
-optimize_module!(module, config)
+# Optimize the module
+optimize_module!(llvm_mod; config=config)
 
 # Convenience functions
-optimize_for_speed!(module)  # Level 3, aggressive optimizations
-optimize_for_size!(module)   # Level 2, size optimizations
+optimize_for_speed!(llvm_mod)  # Level 3, aggressive optimizations
+optimize_for_size!(llvm_mod)   # Level 2, size optimizations
 ```
 
 ## Compilation Caching
