@@ -238,19 +238,14 @@ MONOMORPHIZED_FUNCTIONS
 
 The following registries and constants are not exported but are available for advanced usage:
 
-```@autodocs
-Modules = [LastCall]
-Filter = t -> begin
-    name = try
-        nameof(t)
-    catch
-        return false
-    end
-    return name in [
-        :RUST_LIBRARIES, :RUST_MODULE_REGISTRY, :FUNCTION_REGISTRY, :IRUST_FUNCTIONS,
-        :CURRENT_LIB, :RUST_TO_JULIA_TYPE_MAP, :JULIA_TO_RUST_TYPE_MAP
-    ]
-end
+```@docs
+RUST_LIBRARIES
+RUST_MODULE_REGISTRY
+FUNCTION_REGISTRY
+IRUST_FUNCTIONS
+CURRENT_LIB
+RUST_TO_JULIA_TYPE_MAP
+JULIA_TO_RUST_TYPE_MAP
 ```
 
 ## Utility Functions
