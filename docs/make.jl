@@ -10,7 +10,9 @@ makedocs(
         canonical = "https://atelierarith.github.io/LastCall.jl",
         assets = String[],
         edit_link = :commit,
+        size_threshold = 512000,  # Increase threshold for large API documentation (500 KiB in bytes)
     ),
+    warnonly = [:missing_docs, :cross_references],
     pages = [
         "Home" => "index.md",
         "Getting Started" => [
@@ -33,7 +35,6 @@ makedocs(
             "LLVM Call" => "design/LLVMCALL.md",
         ],
     ],
-    warnonly = [:missing_docs, :cross_references],
 )
 
 deploydocs(

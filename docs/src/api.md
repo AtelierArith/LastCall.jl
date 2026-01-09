@@ -51,6 +51,8 @@ RustStr
 RustError
 CompilationError
 RuntimeError
+CargoBuildError
+DependencyResolutionError
 ```
 
 ## Type Conversion Functions
@@ -87,6 +89,7 @@ cstring_to_julia_string
 
 ```@docs
 format_rustc_error
+suggest_fix_for_error
 ```
 
 ## Compiler Functions
@@ -99,6 +102,9 @@ get_rustc_version
 get_default_compiler
 set_default_compiler
 compile_rust_to_shared_lib
+compile_rust_to_llvm_ir
+load_llvm_ir
+wrap_rust_code
 ```
 
 ## Ownership Type Operations
@@ -109,6 +115,8 @@ is_dropped
 is_valid
 clone
 is_rust_helpers_available
+get_rust_helpers_lib
+get_rust_helpers_lib_path
 ```
 
 ## RustVec Operations
@@ -157,34 +165,156 @@ specialize_generic_code
 infer_type_parameters
 ```
 
-## Internal Constants
+## External Library Integration (Phase 3)
 
-### Type Mapping
+### Dependency Management
 
-The following constant defines the mapping between Rust types and Julia types:
+```@docs
+DependencySpec
+parse_dependencies_from_code
+has_dependencies
+```
+
+### Cargo Project Management
+
+```@docs
+CargoProject
+create_cargo_project
+build_cargo_project
+clear_cargo_cache
+get_cargo_cache_size
+```
+
+## Type System
+
+### Type Mapping Constants
+
+The following constants define the mapping between Rust types and Julia types:
 
 ```julia
-const RUST_JULIA_TYPE_MAP = Dict(
-    "i8" => Int8,
-    "i16" => Int16,
-    "i32" => Int32,
-    "i64" => Int64,
-    "u8" => UInt8,
-    "u16" => UInt16,
-    "u32" => UInt32,
-    "u64" => UInt64,
-    "f32" => Float32,
-    "f64" => Float64,
-    "bool" => Bool,
-    "usize" => Csize_t,
-    "isize" => Cssize_t,
-    "()" => Cvoid,
+# Rust to Julia type mapping
+const RUST_TO_JULIA_TYPE_MAP = Dict{Symbol, Type}(
+    :i8 => Int8,
+    :i16 => Int16,
+    :i32 => Int32,
+    :i64 => Int64,
+    :u8 => UInt8,
+    :u16 => UInt16,
+    :u32 => UInt32,
+    :u64 => UInt64,
+    :f32 => Float32,
+    :f64 => Float64,
+    :bool => Bool,
+    :usize => UInt,
+    :isize => Int,
+    Symbol("()") => Cvoid,
+)
+
+# Julia to Rust type mapping
+const JULIA_TO_RUST_TYPE_MAP = Dict{Type, String}(
+    Int8 => "i8",
+    Int16 => "i16",
+    Int32 => "i32",
+    Int64 => "i64",
+    UInt8 => "u8",
+    UInt16 => "u16",
+    UInt32 => "u32",
+    UInt64 => "u64",
+    Float32 => "f32",
+    Float64 => "f64",
+    Bool => "bool",
+    Cvoid => "()",
 )
 ```
 
-### Registries
+### Internal Registries
+
+The following registries are used internally by LastCall.jl:
 
 ```@docs
 GENERIC_FUNCTION_REGISTRY
 MONOMORPHIZED_FUNCTIONS
+```
+
+The following registries and constants are not exported but are available for advanced usage.
+
+Note: These constants are internal implementation details. They are documented here for completeness but should not be accessed directly by users.
+
+```@autodocs
+Modules = [LastCall]
+Private = true
+Filter = t -> begin
+    name = try
+        nameof(t)
+    catch
+        return false
+    end
+    target_names = [
+        :RUST_LIBRARIES, :RUST_MODULE_REGISTRY, :FUNCTION_REGISTRY, :IRUST_FUNCTIONS,
+        :CURRENT_LIB, :RUST_TO_JULIA_TYPE_MAP, :JULIA_TO_RUST_TYPE_MAP
+    ]
+    return name in target_names
+end
+```
+
+## Utility Functions
+
+### Testing and Debugging
+
+These functions are exported for testing purposes but are considered internal.
+They are wrappers around internal implementation functions.
+
+## Internal Functions and Types
+
+The following functions and types are internal implementation details and are not part of the public API.
+They are documented here for completeness but should not be used directly by users.
+
+```@autodocs
+Modules = [LastCall]
+Filter = t -> begin
+    # Exclude items already documented in @docs blocks above
+    excluded_names = [
+        # Types (documented in @docs blocks)
+        :RustResult, :RustOption, :RustBox, :RustRc, :RustArc, :RustVec, :RustSlice,
+        :RustPtr, :RustRef, :RustString, :RustStr,
+        :RustError, :CompilationError, :RuntimeError, :CargoBuildError, :DependencyResolutionError,
+        :RustCompiler, :OptimizationConfig, :RustFunctionInfo,
+        :DependencySpec, :CargoProject,
+        # Constants/Registries (documented in @docs blocks)
+        :GENERIC_FUNCTION_REGISTRY, :MONOMORPHIZED_FUNCTIONS,
+        :RUST_LIBRARIES, :RUST_MODULE_REGISTRY, :FUNCTION_REGISTRY, :IRUST_FUNCTIONS,
+        # Public functions already documented
+        :unwrap, :unwrap_or, :is_ok, :is_err, :is_some, :is_none,
+        :result_to_exception, :unwrap_or_throw,
+        :rusttype_to_julia, :juliatype_to_rust,
+        :rust_string_to_julia, :rust_str_to_julia,
+        :julia_string_to_rust, :julia_string_to_cstring, :cstring_to_julia_string,
+        :format_rustc_error, :suggest_fix_for_error,
+        :compile_with_recovery, :check_rustc_available, :get_rustc_version,
+        :get_default_compiler, :set_default_compiler, :compile_rust_to_shared_lib,
+        :compile_rust_to_llvm_ir, :load_llvm_ir, :wrap_rust_code,
+        :drop!, :is_dropped, :is_valid, :clone, :is_rust_helpers_available,
+        :get_rust_helpers_lib, :get_rust_helpers_lib_path,
+        :create_rust_vec, :rust_vec_get, :rust_vec_set!, :copy_to_julia!, :to_julia_vector,
+        :clear_cache, :get_cache_size, :list_cached_libraries, :cleanup_old_cache,
+        :optimize_module!, :optimize_for_speed!, :optimize_for_size!,
+        :compile_and_register_rust_function,
+        :register_generic_function, :call_generic_function, :is_generic_function,
+        :monomorphize_function, :specialize_generic_code, :infer_type_parameters,
+        :parse_dependencies_from_code, :has_dependencies,
+        :create_cargo_project, :build_cargo_project,
+        :clear_cargo_cache, :get_cargo_cache_size,
+        # Macros (documented separately)
+        Symbol("@rust"), Symbol("@rust_str"), Symbol("@irust"), Symbol("@irust_str"), Symbol("@rust_llvm"),
+    ]
+    # Get the binding name
+    name = try
+        nameof(t)
+    catch
+        return false
+    end
+    # Include all documented items that are not in the excluded list
+    # This includes internal functions, types, and Base method extensions
+    return !(name in excluded_names)
+end
 ```
