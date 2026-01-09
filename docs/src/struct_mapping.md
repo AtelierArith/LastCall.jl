@@ -419,17 +419,17 @@ pub struct Vec2DD {
     y: f64,
 }
 
-impl Vec2D {
+impl Vec2DD {
     pub fn new(x: f64, y: f64) -> Self {
-        Vec2D { x, y }
+        Vec2DD { x, y }
     }
     
     pub fn zero() -> Self {
-        Vec2D { x: 0.0, y: 0.0 }
+        Vec2DD { x: 0.0, y: 0.0 }
     }
     
-    pub fn add(&self, other: &Vec2D) -> Vec2D {
-        Vec2D {
+    pub fn add(&self, other: &Vec2DD) -> Vec2DD {
+        Vec2DD {
             x: self.x + other.x,
             y: self.y + other.y,
         }
@@ -454,8 +454,8 @@ impl Vec2D {
 """
 
 # Create vectors
-v1 = Vec2D(3.0, 4.0)
-v2 = Vec2D(1.0, 2.0)
+v1 = Vec2DD(3.0, 4.0)
+v2 = Vec2DD(1.0, 2.0)
 
 # Access fields
 println("v1: ($(v1.x), $(v1.y))")  # => v1: (3.0, 4.0)
@@ -469,7 +469,7 @@ v3 = v1.add(v2)
 println("v3: ($(v3.x), $(v3.y))")  # => v3: (6.0, 6.0)
 
 # Static method
-zero = Vec2D.zero()
+zero = Vec2DD.zero()
 println("zero: ($(zero.x), $(zero.y))")  # => zero: (0.0, 0.0)
 
 # Clone
