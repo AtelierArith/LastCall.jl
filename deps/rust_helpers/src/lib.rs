@@ -169,17 +169,6 @@ pub extern "C" fn rust_arc_new_f64(value: f64) -> *mut c_void {
     Arc::into_raw(Arc::new(value)) as *mut c_void
 }
 
-/// Clone an Arc<T> (increment reference count)
-/// Note: This is generic and unsafe - type-specific versions should be preferred
-#[no_mangle]
-pub unsafe extern "C" fn rust_arc_clone(ptr: *mut c_void) -> *mut c_void {
-    if ptr.is_null() {
-        return std::ptr::null_mut();
-    }
-    // This is unsafe - we assume the pointer is valid Arc
-    // In practice, type-specific clone functions should be used
-    ptr
-}
 
 /// Clone an Arc<i32> (increment reference count)
 #[no_mangle]

@@ -24,13 +24,14 @@ struct RustStructInfo
     name::String
     type_params::Vector{String}
     methods::Vector{RustMethod}
+    context_code::String   # Full source code of struct and impls
 end
 
 """
     parse_structs_and_impls(code::String) -> Vector{RustStructInfo}
 
 Heuristic parser to find pub structs and their impl blocks.
-Supports generics (e.g. `struct Point<T>`).
+Supports generics (e.g. `struct Point<T>`) and captures full source context.
 """
 function parse_structs_and_impls(code::String)
     structs = Dict{String, RustStructInfo}()
@@ -38,40 +39,114 @@ function parse_structs_and_impls(code::String)
     # 1. Find all pub structs
     # Pattern: pub struct Name<T> { ... }
     # Capture 1: Name, Capture 2: Generics (optional)
-    struct_pattern = r"pub\s+struct\s+([A-Z]\w*)\s*(?:<(.+?)>)?\s*(?:\{|\()"
-    for m in eachmatch(struct_pattern, code)
+    struct_head_pattern = r"pub\s+struct\s+([A-Z]\w*)\s*(?:<(.+?)>)?\s*(?:\{|\()"
+
+    for m in eachmatch(struct_head_pattern, code)
         name = String(m.captures[1])
         params_str = m.captures[2]
 
         type_params = String[]
         if params_str !== nothing
-            # split T, U, ...
             for p in split(params_str, ',')
                 push!(type_params, strip(p))
             end
         end
 
+        # Extract the full struct definition block
+        struct_def = extract_block_at(code, m.offset)
+        context = struct_def !== nothing ? struct_def : ""
+
         if !haskey(structs, name)
-            structs[name] = RustStructInfo(name, type_params, RustMethod[])
+            structs[name] = RustStructInfo(name, type_params, RustMethod[], context)
         end
     end
 
     # 2. Find impl blocks
     # Pattern: impl<T> Name<T> { ... } or impl Name { ... }
-    # We relax the matching to find the struct name.
-    # Regex: impl (optional generic decl) Name (optional generic args) { body }
-    impl_pattern = r"impl(?:\s*<.*?>)?\s+([A-Z]\w*)(?:\s*<.*?>)?\s*\{([\s\S]*?)\n\}"
-    for m in eachmatch(impl_pattern, code)
-        struct_name = String(m.captures[1])
-        impl_body = m.captures[2]
+    impl_head_pattern = r"impl(?:\s*<.*?>)?\s+([A-Z]\w*)(?:\s*<.*?>)?\s*\{"
 
-        if haskey(structs, struct_name)
-            methods = parse_methods_in_impl(impl_body)
-            append!(structs[struct_name].methods, methods)
+    for m in eachmatch(impl_head_pattern, code)
+        struct_name = String(m.captures[1])
+
+        # Extract the full impl block
+        impl_block = extract_block_at(code, m.offset)
+
+        if impl_block !== nothing && haskey(structs, struct_name)
+            # Append this impl block to the struct's context (needed for generics)
+            info = structs[struct_name]
+            # Replace immutable struct
+            new_context = info.context_code * "\n" * impl_block
+
+            # Parse methods inside the block (strip the "impl ... {" header first)
+            # Simple heuristic: find first {
+            header_end = findfirst('{', impl_block)
+            if header_end !== nothing
+                body = impl_block[header_end+1:end-1] # content inside braces
+                methods = parse_methods_in_impl(body)
+                append!(info.methods, methods)
+            end
+
+            structs[struct_name] = RustStructInfo(info.name, info.type_params, info.methods, new_context)
         end
     end
 
     return collect(values(structs))
+end
+
+"""
+    extract_block_at(code::String, start_idx::Int) -> Union{String, Nothing}
+
+Extract a balanced brace block starting near start_idx.
+Searches for the first '{' at or after start_idx.
+"""
+function extract_block_at(code::String, start_idx::Int)
+    # Find start brace
+    # Search range limited to reasonable distance to avoid false positives?
+    # No, look until next brace.
+    brace_idx = findnext('{', code, start_idx)
+    if brace_idx === nothing
+        # Maybe it's a tuple struct `struct Foo(i32);` -> ends with ;
+        semi_idx = findnext(';', code, start_idx)
+        if semi_idx !== nothing
+            # Check if there is a { before it?
+            return code[start_idx:semi_idx]
+        end
+        return nothing
+    end
+
+    # Count braces
+    count = 1
+    idx = brace_idx + 1
+    in_string = false
+    string_char = nothing
+
+    while idx <= ncodeunits(code)
+        char = code[idx]
+
+        if char == '"' || char == '\''
+            if !in_string
+                in_string = true
+                string_char = char
+            elseif char == string_char
+                in_string = false
+                string_char = nothing
+            end
+        elseif !in_string
+            if char == '{'
+                count += 1
+            elseif char == '}'
+                count -= 1
+                if count == 0
+                    # Include the whole declaration line?
+                    # The caller `start_idx` points to `pub struct...`.
+                    # We want from start_idx to idx.
+                    return code[start_idx:idx]
+                end
+            end
+        end
+        idx = nextind(code, idx)
+    end
+    return nothing
 end
 
 """
@@ -96,9 +171,7 @@ function parse_methods_in_impl(impl_body::AbstractString)
         arg_names = String[]
         arg_types = String[]
 
-        # Quick argument parsing (improved to handle generics slightly better)
-        # Note: This simple comma split fails on nested generics like Vec<T, U>.
-        # For Phase 4 prototype, we assume simple types or wait for a real parser.
+        # Quick argument parsing
         current_arg = ""
         bracket_level = 0
 
@@ -110,7 +183,6 @@ function parse_methods_in_impl(impl_body::AbstractString)
                 bracket_level -= 1
                 current_arg *= char
             elseif char == ',' && bracket_level == 0
-                # End of argument
                 _process_arg!(arg_names, arg_types, strip(current_arg))
                 current_arg = ""
             else
@@ -132,9 +204,6 @@ function _process_arg!(names, types, arg)
         return
     end
     if occursin(':', arg)
-        # Handle "name: type"
-        # Be careful not to split on type bounds like T: Display
-        # But args usually don't have bounds.
         parts = split(arg, ':', limit=2)
         push!(names, strip(parts[1]))
         push!(types, strip(parts[2]))
@@ -145,14 +214,96 @@ end
     generate_struct_wrappers(info::RustStructInfo) -> String
 
 Generate "extern C" C-FFI wrappers for a given struct.
+For generic structs, registers them as generic functions instead of returning static wrappers.
 """
 function generate_struct_wrappers(info::RustStructInfo)
     io = IOBuffer()
     struct_name = info.name
 
-    println(io, "\n// --- Auto-generated FFI wrappers for $struct_name ---")
+    # Handle Generics
+    if !isempty(info.type_params)
+        # For generics, we generate generic wrapper functions and register them.
+        # We DO NOT return them to be compiled into the main lib.
 
-    # Add a free function for the finalizer
+        type_params_decl = "<" * join(info.type_params, ", ") * ">"
+        # We assume strict mirroring for now: T, U...
+
+        # Helper to register
+        function reg(func_name, code)
+             # context: Struct def + Impl defs
+             register_generic_function(func_name, code, Symbol.(info.type_params), Dict{Symbol, String}(), info.context_code)
+        end
+
+        # Constructor wrapper logic
+        # pub fn Point_new<T>(x: T) -> *mut Point<T> { ... }
+
+        for m in info.methods
+             wrapper_name = "$(struct_name)_$(m.name)"
+
+             # Build signature
+             wrapper_args = String[]
+             call_args = String[]
+
+             if !m.is_static
+                 # ptr: *mut Point<T>
+                 mut_prefix = m.is_mutable ? "*mut " : "*const "
+                 push!(wrapper_args, "ptr: $(mut_prefix)$(struct_name)$(type_params_decl)")
+
+                 ref_prefix = m.is_mutable ? "&mut " : "&"
+                 push!(call_args, "unsafe { $(ref_prefix)*ptr }")
+             end
+
+             for (aname, atype) in zip(m.arg_names, m.arg_types)
+                 push!(wrapper_args, "$aname: $atype")
+
+                 # if argument is self-like, handle passing?
+                 # For wrapper generation, arguments are usually simple or generic T
+                 push!(call_args, aname)
+             end
+
+             args_str = join(wrapper_args, ", ")
+
+             w_io = IOBuffer()
+
+             is_ctor = m.name == "new" || m.return_type == "Self"
+
+             ret_decl = ""
+             if is_ctor
+                 ret_decl = " -> *mut $(struct_name)$(type_params_decl)"
+                 println(w_io, "pub fn $(wrapper_name)$(type_params_decl)($args_str)$ret_decl {")
+                 println(w_io, "    let obj = $(struct_name)::$(m.name)($(join(m.arg_names, ", ")));")
+                 println(w_io, "    Box::into_raw(Box::new(obj))")
+                 println(w_io, "}")
+             else
+                 ret_decl = m.return_type == "()" ? "" : " -> $(m.return_type)"
+                 println(w_io, "pub fn $(wrapper_name)$(type_params_decl)($args_str)$ret_decl {")
+                 # Extract self
+                 if m.is_static
+                     println(w_io, "    $(struct_name)::$(m.name)($(join(m.arg_names, ", ")))")
+                 else
+                     println(w_io, "    let self_obj = $(call_args[1]);")
+                     println(w_io, "    self_obj.$(m.name)($(join(m.arg_names, ", ")))")
+                 end
+                 println(w_io, "}")
+             end
+
+             code = String(take!(w_io))
+             reg(wrapper_name, code)
+        end
+
+        # Free function
+        free_name = "$(struct_name)_free"
+        f_io = IOBuffer()
+        println(f_io, "pub fn $(free_name)$(type_params_decl)(ptr: *mut $(struct_name)$(type_params_decl)) {")
+        println(f_io, "    if !ptr.is_null() { unsafe { Box::from_raw(ptr); } }")
+        println(f_io, "}")
+        reg(free_name, String(take!(f_io)))
+
+        return "\n// Generics struct $(struct_name): wrappers registered for on-demand monomorphization.\n"
+    end
+
+    # Non-Generic Path (Original)
+    println(io, "\n// --- Auto-generated FFI wrappers for $struct_name ---")
     println(io, "#[no_mangle]")
     println(io, "pub extern \"C\" fn $(struct_name)_free(ptr: *mut $struct_name) {")
     println(io, "    if !ptr.is_null() {")
@@ -183,7 +334,6 @@ function generate_struct_wrappers(info::RustStructInfo)
         end
 
         args_str = join(wrapper_args, ", ")
-        call_params = join(call_args, ", ")
 
         if is_constructor
             println(io, "pub extern \"C\" fn $wrapper_name($args_str) -> *mut $struct_name {")
@@ -211,23 +361,99 @@ end
 Generate Julia code to define a corresponding mutable struct and its methods.
 """
 function emit_julia_definitions(info::RustStructInfo)
-    # Use escaped symbols to ensure they are defined in the caller's scope
     struct_name_str = info.name
     esc_struct = esc(Symbol(struct_name_str))
 
+    # Handle Generics
+    if !isempty(info.type_params)
+        # struct Point{T}
+        T_params = [Symbol(t) for t in info.type_params]
+        esc_T_params = [esc(t) for t in T_params]
+        where_clause = :($(esc_struct){$(esc_T_params...)})
+
+        exprs = []
+
+        # 1. Define Struct
+        push!(exprs, quote
+            mutable struct $where_clause
+                ptr::Ptr{Cvoid}
+                lib_name::String
+
+                function $where_clause(ptr::Ptr{Cvoid}, lib::String) where {$(esc_T_params...)}
+                    obj = new{$(esc_T_params...)}(ptr, lib)
+                    finalizer(obj) do x
+                        # Call free (generic)
+                        # We use a special helper that resolves the generic free function
+                        # struct_func: Point_free
+                        _call_generic_free(x.lib_name, $(struct_name_str * "_free"), x.ptr, $(esc_T_params...))
+                        x.ptr = C_NULL
+                    end
+                    return obj
+                end
+            end
+        end)
+
+        # 2. Methods
+        for m in info.methods
+            fname = esc(Symbol(m.name))
+            wrapper_name = "$(struct_name_str)_$(m.name)"
+            is_ctor = m.name == "new" || m.return_type == "Self"
+
+            arg_names = [Symbol(an) for an in m.arg_names]
+            esc_args = [esc(a) for a in arg_names]
+
+            if m.is_static
+                 if is_ctor
+                     # Point(x, y) -> Point{T}(ptr, lib)
+                     # Needs to infer T? Or explicit?
+                     # For simplicity, we define: function Point{T}(args...)
+                     push!(exprs, quote
+                         function (::Type{$esc_struct})($(esc_args...))
+                             # Infer T from args? Or assume args are T?
+                             # This is tricky without explicit types.
+                             # We assume simpler case: Point{Int32}(1, 2)
+                             error("Automatic constructor for generic structs is not yet fully implemented. Use explicit builder pattern.")
+                         end
+
+                         function (::Type{$where_clause})($(esc_args...)) where {$(esc_T_params...)}
+                             # Precompile free function to avoid compilation in finalizer
+                             _precompile_generic_free($(struct_name_str * "_free"), ($(esc_T_params...),))
+
+                             # Call generic constructor
+                             # Point_new<T>(...)
+                             # Pass args and types as tuples to separate them
+                             ptr_lib_tuple = _call_generic_constructor($wrapper_name, ($(esc_args...),), ($(esc_T_params...),))
+
+                             (ptr_val, lib_val) = ptr_lib_tuple
+                             return $esc_struct{$(esc_T_params...)}(ptr_val, lib_val)
+                         end
+                     end)
+                 end
+            else
+                 push!(exprs, quote
+                     function $fname(self::$where_clause, $(esc_args...)) where {$(esc_T_params...)}
+                         _call_generic_method(self.lib_name, $wrapper_name, self.ptr, ($(esc_args...),), ($(esc_T_params...),))
+                     end
+                 end)
+            end
+        end
+
+        return Expr(:block, exprs...)
+    end
+
+    # Non-Generic Path (Original)
     exprs = []
 
     # 1. Define the struct
     push!(exprs, quote
         mutable struct $esc_struct
             ptr::Ptr{Cvoid}
-            lib_name::String # Store which library this object belongs to
+            lib_name::String
 
             function $esc_struct(ptr::Ptr{Cvoid}, lib::String)
                 obj = new(ptr, lib)
                 finalizer(obj) do x
                     if x.ptr != C_NULL
-                        # Call free through explicit library reference
                         _call_rust_free(x.lib_name, $(struct_name_str * "_free"), x.ptr)
                         x.ptr = C_NULL
                     end
@@ -251,14 +477,12 @@ function emit_julia_definitions(info::RustStructInfo)
             if is_ctor
                 push!(exprs, quote
                     function (::Type{$esc_struct})($(esc_args...))
-                        # Use runtime-resolved current library
                         lib = get_current_library()
                         ptr = _call_rust_constructor(lib, $wrapper_name, $(esc_args...))
                         return $esc_struct(ptr, lib)
                     end
                 end)
             else
-                # Static method: map return type
                 jl_ret_type = rust_to_julia_type_sym(m.return_type)
                 push!(exprs, quote
                     function $fname($(esc_args...))
@@ -268,11 +492,9 @@ function emit_julia_definitions(info::RustStructInfo)
                 end)
             end
         else
-            # Instance method: map return type
             jl_ret_type = rust_to_julia_type_sym(m.return_type)
             push!(exprs, quote
                 function $fname(self::$esc_struct, $(esc_args...))
-                    # Call using the library the object was created with
                     return _call_rust_method(self.lib_name, $wrapper_name, self.ptr, $(esc_args...), $(QuoteNode(jl_ret_type)))
                 end
             end)
@@ -282,8 +504,9 @@ function emit_julia_definitions(info::RustStructInfo)
     return Expr(:block, exprs...)
 end
 
-# Internal helpers to handle the calls with explicit library names
+# Internal helpers
 function _call_rust_free(lib_name::String, func_name::String, ptr::Ptr{Cvoid})
+    # This is for non-generic
     try
         _rust_call_typed(lib_name, func_name, Cvoid, ptr)
     catch e
@@ -296,12 +519,8 @@ function _call_rust_constructor(lib_name::String, func_name::String, args...)
 end
 
 function _call_rust_method(lib_name::String, func_name::String, ptr::Ptr{Cvoid}, args...)
-    # Special case: return type passed as last argument
     ret_type = last(args)
     actual_args = args[1:end-1]
-
-    # Convert Symbol back to Type if needed, but our _rust_call_typed and helpers
-    # usually handle types. Let's resolve the symbol using a simple mapping.
     real_ret_type = julia_sym_to_type(ret_type)
 
     if ptr == C_NULL
@@ -309,6 +528,85 @@ function _call_rust_method(lib_name::String, func_name::String, ptr::Ptr{Cvoid},
     else
         return _rust_call_typed(lib_name, func_name, real_ret_type, ptr, actual_args...)
     end
+end
+
+# Generic helpers
+function _call_generic_constructor(func_name::String, args::Tuple, types::Tuple)
+    # Use explicit types to monomorphize
+    # We assume types correspond to T, U... in order
+    # We need parameter names (T, U).
+    # Helper to get parameter names from registry?
+    generic_info = GENERIC_FUNCTION_REGISTRY[func_name]
+    param_names = generic_info.type_params
+
+    if length(types) != length(param_names)
+        error("Type parameter count mismatch for $func_name: expected $(length(param_names)), got $(length(types))")
+    end
+
+    type_params = Dict{Symbol, Type}()
+    for (i, p) in enumerate(param_names)
+        type_params[p] = types[i]
+    end
+
+    info = monomorphize_function(func_name, type_params)
+
+    # args are in a tuple, need to splat
+    ptr = call_rust_function(info.func_ptr, info.return_type, args...)
+
+    return (ptr, info.lib_name)
+end
+
+function _call_generic_method(lib_name::String, func_name::String, ptr::Ptr{Cvoid}, args::Tuple, types::Tuple)
+    generic_info = GENERIC_FUNCTION_REGISTRY[func_name]
+    param_names = generic_info.type_params
+
+    type_params = Dict{Symbol, Type}()
+    for (i, p) in enumerate(param_names)
+        type_params[p] = types[i]
+    end
+
+    info = monomorphize_function(func_name, type_params)
+
+    # Method call: pass ptr (self) then args
+    return call_rust_function(info.func_ptr, info.return_type, ptr, args...)
+end
+
+function _precompile_generic_free(func_name::String, types::Tuple)
+    # Same as _call_generic_free but only compile/cache
+    generic_info = GENERIC_FUNCTION_REGISTRY[func_name]
+    param_names = generic_info.type_params
+
+    type_params = Dict{Symbol, Type}()
+    for (i, p) in enumerate(param_names)
+        type_params[p] = types[i]
+    end
+
+    # This will cache the function info
+    monomorphize_function(func_name, type_params)
+end
+
+function _call_generic_free(lib_name::String, func_name::String, ptr::Ptr{Cvoid}, types...)
+    # We need to construct the type params manually since we only have types, not values.
+    # call_generic_function infers from values.
+    # We need explicit monomorphization call.
+
+    generic_info = GENERIC_FUNCTION_REGISTRY[func_name]
+    param_names = generic_info.type_params
+
+    type_params = Dict{Symbol, Type}()
+    for (i, p) in enumerate(param_names)
+        type_params[p] = types[i]
+    end
+
+    # Should use cached version (fast path for finalizer)
+    info = get_monomorphized_function(func_name, type_params)
+    if info === nothing
+        # Fallback to monomorphize (unsafe in finalizer)
+        # Should not happen if precompiled
+        info = monomorphize_function(func_name, type_params)
+    end
+
+    call_rust_function(info.func_ptr, Cvoid, ptr)
 end
 
 function julia_sym_to_type(s::Symbol)

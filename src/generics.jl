@@ -14,6 +14,7 @@ struct GenericFunctionInfo
     code::String
     type_params::Vector{Symbol}  # e.g., [:T, :U]
     constraints::Dict{Symbol, String}  # e.g., :T => "Copy" (trait bounds)
+    context::String  # Additional code (e.g., struct definitions) needed for compilation
 end
 
 """
@@ -70,7 +71,7 @@ function parse_generic_function(code::String, func_name::String)
     constraints = Dict{Symbol, String}()
     # TODO: Parse trait bounds more thoroughly
 
-    return GenericFunctionInfo(func_name, code, type_params, constraints)
+    return GenericFunctionInfo(func_name, code, type_params, constraints, "")
 end
 
 """
@@ -93,9 +94,12 @@ specialize_generic_code(code, type_params)
 function specialize_generic_code(code::String, type_params::Dict{Symbol, <:Type})
     specialized = code
 
-    # 1. First, remove the generic parameter list from function signature(s)
+    # 1. First, remove the generic parameter list from function signature(s) and impl blocks
     # Pattern: fn name<T, U>( -> fn name(
     specialized = replace(specialized, Regex("(fn\\s+\\w+)\\s*<.+?>\\s*\\(", "s") => s"\1(")
+
+    # Pattern: impl<T> -> impl
+    specialized = replace(specialized, Regex("impl\\s*<.+?>", "s") => "impl")
 
     # Convert Julia types to Rust types
     julia_to_rust_map = Dict(
@@ -282,6 +286,12 @@ function monomorphize_function(func_name::String, type_params::Dict{Symbol, <:Ty
         specialized_code = replace(specialized_code, "fn $specialized_name(" => "#[no_mangle]\npub extern \"C\" fn $specialized_name(")
     end
 
+    # Now prepend the specialized context
+    if !isempty(generic_info.context)
+        specialized_context = specialize_generic_code(generic_info.context, type_params)
+        specialized_code = specialized_context * "\n" * specialized_code
+    end
+
     # Compile the specialized function
     # Note: compile_rust_to_shared_lib and get_default_compiler are in compiler.jl
     # We need to ensure they're available when this runs
@@ -332,19 +342,29 @@ function monomorphize_function(func_name::String, type_params::Dict{Symbol, <:Ty
     arg_types = collect(values(type_params))
 
     # Try to infer return type from code (simplified)
-    # Pattern: -> T or -> i32
-    ret_type_match = match(r"->\s*(\w+)", specialized_code)
-    if ret_type_match !== nothing
-        ret_type_str = ret_type_match.captures[1]
-        # Map Rust type to Julia type
-        rust_to_julia = Dict(
-            "i32" => Int32, "i64" => Int64,
-            "u32" => UInt32, "u64" => UInt64,
-            "f32" => Float32, "f64" => Float64,
-            "bool" => Bool,
-        )
-        if haskey(rust_to_julia, ret_type_str)
-            ret_type = rust_to_julia[ret_type_str]
+    # Pattern: -> *mut... or -> *const...
+    if occursin(r"->\s*\*(?:mut|const)", specialized_code)
+         ret_type = Ptr{Cvoid}
+    else
+        # Pattern: -> T or -> i32
+        ret_type_match = match(r"->\s*([\w:<>]+)", specialized_code)
+        if ret_type_match !== nothing
+            ret_type_str = ret_type_match.captures[1]
+            # Map Rust type to Julia type
+            rust_to_julia = Dict(
+                "i32" => Int32, "i64" => Int64,
+                "u32" => UInt32, "u64" => UInt64,
+                "f32" => Float32, "f64" => Float64,
+                "bool" => Bool,
+            )
+            if haskey(rust_to_julia, ret_type_str)
+                ret_type = rust_to_julia[ret_type_str]
+            elseif length(type_params) > 0
+                 # Fallback to T if type string matches a type param?
+                 # Actually, we should be careful.
+                 # If no match, defaulting to first param is risky.
+                 # Let's keep the fallback for now as it handles '-> i32' when T=i32.
+            end
         end
     end
 
@@ -358,7 +378,7 @@ function monomorphize_function(func_name::String, type_params::Dict{Symbol, <:Ty
 end
 
 """
-    register_generic_function(func_name::String, code::String, type_params::Vector{Symbol}, constraints::Dict{Symbol, String})
+    register_generic_function(func_name, code, type_params, constraints, context)
 
 Register a generic Rust function for later monomorphization.
 
@@ -367,27 +387,11 @@ Register a generic Rust function for later monomorphization.
 - `code`: Rust function code (with generics)
 - `type_params`: List of type parameter symbols
 - `constraints`: Trait bounds for type parameters
-
-# Example
-```julia
-register_generic_function(
-    "identity",
-    "pub fn identity<T>(x: T) -> T { x }",
-    [:T]
-)
-
-# Or with constraints
-register_generic_function(
-    "add",
-    "pub fn add<T: Copy + Add<Output=T>>(a: T, b: T) -> T { a + b }",
-    [:T],
-    Dict{Symbol, String}(:T => "Copy + Add<Output=T>")
-)
-```
+- `context`: Additional code (e.g. struct definitions) needed for compilation
 """
-function register_generic_function(func_name::String, code::String, type_params::Vector{Symbol}, constraints::Dict{Symbol, String}=Dict{Symbol, String}())
+function register_generic_function(func_name::String, code::String, type_params::Vector{Symbol}, constraints::Dict{Symbol, String}=Dict{Symbol, String}(), context::String="")
     # println("DEBUG: Registering generic function in GENERIC_FUNCTION_REGISTRY: $func_name")
-    info = GenericFunctionInfo(func_name, code, type_params, constraints)
+    info = GenericFunctionInfo(func_name, code, type_params, constraints, context)
     GENERIC_FUNCTION_REGISTRY[func_name] = info
     return info
 end
