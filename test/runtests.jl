@@ -25,6 +25,11 @@ include("test_rust_helpers_integration.jl")
 # Include documentation examples tests
 include("test_docs_examples.jl")
 
+# Phase 3: External library integration tests
+include("test_dependencies.jl")
+include("test_cargo.jl")
+include("test_ndarray.jl")
+
 @testset "LastCall.jl" begin
 
     @testset "Type Mappings" begin
