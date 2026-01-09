@@ -53,7 +53,7 @@ function generate_cache_key(code::String, compiler::RustCompiler)
     code_hash = hash(code)
     config_str = "$(compiler.optimization_level)_$(compiler.emit_debug_info)_$(compiler.target_triple)"
     key_data = "$(code_hash)_$(config_str)"
-    
+
     # Use SHA256 for the final key
     hash_bytes = sha256(key_data)
     return bytes2hex(hash_bytes)
@@ -69,11 +69,11 @@ function get_cached_library(cache_key::String)
     cache_dir = get_cache_dir()
     lib_ext = get_library_extension()
     lib_path = joinpath(cache_dir, "$(cache_key)$(lib_ext)")
-    
+
     if isfile(lib_path)
         return lib_path
     end
-    
+
     return nothing
 end
 
@@ -86,11 +86,11 @@ Returns the path to the cached IR file if it exists, nothing otherwise.
 function get_cached_llvm_ir(cache_key::String)
     cache_dir = get_cache_dir()
     ir_path = joinpath(cache_dir, "$(cache_key).ll")
-    
+
     if isfile(ir_path)
         return ir_path
     end
-    
+
     return nothing
 end
 
@@ -103,13 +103,13 @@ function save_cached_library(cache_key::String, lib_path::String, metadata::Cach
     cache_dir = get_cache_dir()
     lib_ext = get_library_extension()
     dest_lib_path = joinpath(cache_dir, "$(cache_key)$(lib_ext)")
-    
+
     # Copy the library file
     cp(lib_path, dest_lib_path, force=true)
-    
+
     # Save metadata
     save_cache_metadata(cache_key, metadata)
-    
+
     return dest_lib_path
 end
 
@@ -121,10 +121,10 @@ Save a compiled LLVM IR file to the cache.
 function save_cached_llvm_ir(cache_key::String, ir_path::String)
     cache_dir = get_cache_dir()
     dest_ir_path = joinpath(cache_dir, "$(cache_key).ll")
-    
+
     # Copy the IR file
     cp(ir_path, dest_ir_path, force=true)
-    
+
     return dest_ir_path
 end
 
@@ -138,16 +138,16 @@ function load_cached_library(cache_key::String)
     if cached_lib === nothing
         error("Cached library not found for key: $cache_key")
     end
-    
+
     # Load the library
     lib_handle = Libdl.dlopen(cached_lib, Libdl.RTLD_GLOBAL | Libdl.RTLD_NOW)
     if lib_handle == C_NULL
         error("Failed to load cached library: $cached_lib")
     end
-    
+
     # Generate library name from cache key
     lib_name = "rust_cache_$(cache_key[1:16])"  # Use first 16 chars for readability
-    
+
     return lib_handle, lib_name
 end
 
@@ -159,7 +159,7 @@ Save cache metadata to a JSON file.
 function save_cache_metadata(cache_key::String, metadata::CacheMetadata)
     metadata_dir = get_metadata_dir()
     metadata_path = joinpath(metadata_dir, "$(cache_key).json")
-    
+
     # Simple JSON-like serialization (we'll use a simple format)
     metadata_dict = Dict(
         "cache_key" => metadata.cache_key,
@@ -169,7 +169,7 @@ function save_cache_metadata(cache_key::String, metadata::CacheMetadata)
         "created_at" => string(metadata.created_at),
         "functions" => metadata.functions
     )
-    
+
     # Write as JSON (simple format for now)
     open(metadata_path, "w") do io
         println(io, "{")
@@ -191,11 +191,11 @@ Load cache metadata from a JSON file.
 function load_cache_metadata(cache_key::String)
     metadata_dir = get_metadata_dir()
     metadata_path = joinpath(metadata_dir, "$(cache_key).json")
-    
+
     if !isfile(metadata_path)
         return nothing
     end
-    
+
     # Simple JSON parsing (for now, we'll use a basic approach)
     # In production, consider using JSON.jl
     try
@@ -233,7 +233,7 @@ function get_cache_size()
     if !isdir(cache_dir)
         return Int64(0)
     end
-    
+
     total_size = Int64(0)
     for (root, dirs, files) in walkdir(cache_dir)
         for file in files
@@ -243,7 +243,7 @@ function get_cache_size()
             end
         end
     end
-    
+
     return total_size
 end
 
@@ -257,10 +257,10 @@ function list_cached_libraries()
     if !isdir(cache_dir)
         return String[]
     end
-    
+
     lib_ext = get_library_extension()
     cached_keys = String[]
-    
+
     for file in readdir(cache_dir)
         if endswith(file, lib_ext)
             # Extract cache key from filename
@@ -268,7 +268,7 @@ function list_cached_libraries()
             push!(cached_keys, key)
         end
     end
-    
+
     return cached_keys
 end
 
@@ -282,10 +282,10 @@ function cleanup_old_cache(max_age_days::Int = 30)
     if !isdir(cache_dir)
         return nothing
     end
-    
+
     cutoff_time = now() - Day(max_age_days)
     removed_count = 0
-    
+
     for file in readdir(cache_dir)
         file_path = joinpath(cache_dir, file)
         if isfile(file_path)
@@ -296,7 +296,7 @@ function cleanup_old_cache(max_age_days::Int = 30)
             end
         end
     end
-    
+
     # Also clean metadata directory
     metadata_dir = get_metadata_dir()
     if isdir(metadata_dir)
@@ -310,7 +310,7 @@ function cleanup_old_cache(max_age_days::Int = 30)
             end
         end
     end
-    
+
     return removed_count
 end
 
@@ -322,22 +322,22 @@ Check if a cached library is still valid for the given code and compiler setting
 function is_cache_valid(cache_key::String, code::String, compiler::RustCompiler)
     # Generate expected cache key
     expected_key = generate_cache_key(code, compiler)
-    
+
     # Check if keys match
     if cache_key != expected_key
         return false
     end
-    
+
     # Check if file exists
     cached_lib = get_cached_library(cache_key)
     if cached_lib === nothing
         return false
     end
-    
+
     # Check if file is readable
     if !isfile(cached_lib) || !isreadable(cached_lib)
         return false
     end
-    
+
     return true
 end

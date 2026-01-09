@@ -7,6 +7,9 @@ include("test_cache.jl")
 # Include ownership tests
 include("test_ownership.jl")
 
+# Include llvmcall tests
+include("test_llvmcall.jl")
+
 @testset "LastCall.jl" begin
 
     @testset "Type Mappings" begin

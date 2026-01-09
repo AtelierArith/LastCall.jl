@@ -63,36 +63,33 @@ function infer_function_types(lib_name::String, func_name::String)
 end
 
 """
-    julia_to_c_type(t::Type) -> Type
+    julia_to_c_type(::Type{T}) -> Type
 
 Convert a Julia type to its C-compatible equivalent for ccall.
+Uses multiple dispatch for efficient type-specific conversions.
 """
-function julia_to_c_type(t::Type)
-    if t <: Integer
-        return t
-    elseif t <: AbstractFloat
-        return t
-    elseif t <: Bool
-        return Bool
-    elseif t <: Ptr
-        return Ptr{Cvoid}
-    elseif t == String || t == Cstring || t == RustString || t == RustStr
-        return Cstring
-    elseif t <: AbstractString
-        return Cstring
-    else
-        return Ptr{Cvoid}
-    end
-end
+# Default fallback for unknown types
+julia_to_c_type(::Type{T}) where {T} = Ptr{Cvoid}
 
+# Specific type conversions using multiple dispatch
+julia_to_c_type(::Type{T}) where {T<:Integer} = T
+julia_to_c_type(::Type{T}) where {T<:AbstractFloat} = T
+julia_to_c_type(::Type{Bool}) = Bool
+julia_to_c_type(::Type{T}) where {T<:Ptr} = Ptr{Cvoid}
+julia_to_c_type(::Type{String}) = Cstring
+julia_to_c_type(::Type{Cstring}) = Cstring
+julia_to_c_type(::Type{RustString}) = Cstring
+julia_to_c_type(::Type{RustStr}) = Cstring
+julia_to_c_type(::Type{T}) where {T<:AbstractString} = Cstring
+
+# Helper functions for ccall type handling (using multiple dispatch)
+# Note: Cvoid === Nothing in Julia, so we only define for Cvoid
 ccall_return_type(::Type{Cvoid}) = Cvoid
-ccall_return_type(::Type{Nothing}) = Cvoid
 ccall_return_type(::Type{Cstring}) = Cstring
 ccall_return_type(::Type{String}) = Cstring
 ccall_return_type(::Type{T}) where {T} = T
 
 convert_return(::Type{Cvoid}, _) = nothing
-convert_return(::Type{Nothing}, _) = nothing
 convert_return(::Type{Cstring}, value) = cstring_to_julia_string(value)
 convert_return(::Type{String}, value) = cstring_to_julia_string(value)
 convert_return(::Type{T}, value) where {T} = value
@@ -102,7 +99,6 @@ default_numeric_arg_type(::Type{UInt32}) = Int32
 default_numeric_arg_type(::Type{Cstring}) = Int32
 default_numeric_arg_type(::Type{String}) = Int32
 default_numeric_arg_type(::Type{Cvoid}) = Int64
-default_numeric_arg_type(::Type{Nothing}) = Int64
 default_numeric_arg_type(::Type{T}) where {T} = T
 
 normalize_arg_type(::Type{R}, ::Type{T}) where {R,T} = T
@@ -116,22 +112,23 @@ function normalize_arg_types(::Type{R}, argt::Type{<:Tuple}) where {R}
     return Core.apply_type(Tuple, normalized...)
 end
 
-is_supported_arg_type(::Type{T}) where {T} = T <: Integer ||
-    T <: AbstractFloat ||
-    T == Bool ||
-    T <: Ptr ||
-    T <: Ref ||
-    T <: AbstractString ||
-    T == Cstring
+is_supported_arg_type(::Type{T}) where {T<:Integer} = true
+is_supported_arg_type(::Type{T}) where {T<:AbstractFloat} = true
+is_supported_arg_type(::Type{Bool}) = true
+is_supported_arg_type(::Type{T}) where {T<:Ptr} = true
+is_supported_arg_type(::Type{T}) where {T<:Ref} = true
+is_supported_arg_type(::Type{T}) where {T<:AbstractString} = true
+is_supported_arg_type(::Type{Cstring}) = true
+is_supported_arg_type(::Type) = false
 
-is_supported_return_type(::Type{T}) where {T} = T <: Integer ||
-    T <: AbstractFloat ||
-    T == Bool ||
-    T == Cvoid ||
-    T == Nothing ||
-    T == String ||
-    T == Cstring ||
-    T <: Ptr
+is_supported_return_type(::Type{T}) where {T<:Integer} = true
+is_supported_return_type(::Type{T}) where {T<:AbstractFloat} = true
+is_supported_return_type(::Type{Bool}) = true
+is_supported_return_type(::Type{Cvoid}) = true  # Note: Cvoid === Nothing
+is_supported_return_type(::Type{String}) = true
+is_supported_return_type(::Type{Cstring}) = true
+is_supported_return_type(::Type{T}) where {T<:Ptr} = true
+is_supported_return_type(::Type) = false
 
 ccall_arg_type(::Type{T}) where {T<:AbstractString} = Cstring
 ccall_arg_type(::Type{Cstring}) = Cstring
@@ -201,29 +198,28 @@ end
 """
     call_rust_function_infer(func_ptr::Ptr{Cvoid}, args...)
 
-Call a Rust function, inferring the return type from the first argument.
+Call a Rust function, inferring the return type from the first argument type.
+Uses @generated function for compile-time optimization based on argument types.
 """
-function call_rust_function_infer(func_ptr::Ptr{Cvoid}, args...)
-    if isempty(args)
-        return call_rust_function(func_ptr, Cvoid)
+@generated function call_rust_function_infer(func_ptr::Ptr{Cvoid}, args...)
+    if length(args) == 0
+        return :(call_rust_function(func_ptr, Cvoid))
     end
-
-    first_type = typeof(first(args))
-    if first_type == Int32
-        return call_rust_function(func_ptr, Int32, args...)
-    elseif first_type == Int64
-        return call_rust_function(func_ptr, Int64, args...)
-    elseif first_type == Float32
-        return call_rust_function(func_ptr, Float32, args...)
-    elseif first_type == Float64
-        return call_rust_function(func_ptr, Float64, args...)
-    elseif first_type == Bool
-        return call_rust_function(func_ptr, Bool, args...)
-    elseif first_type == String || first_type == Cstring
-        return call_rust_function(func_ptr, Cstring, args...)
+    
+    # Infer return type from first argument type at compile time
+    ret_type = if args[1] <: Integer
+        args[1]
+    elseif args[1] <: AbstractFloat
+        args[1]
+    elseif args[1] === Bool
+        Bool
+    elseif args[1] <: AbstractString || args[1] === Cstring
+        Cstring
     else
-        return call_rust_function(func_ptr, Int64, args...)
+        Int64  # Default fallback
     end
+    
+    return :(call_rust_function(func_ptr, $ret_type, args...))
 end
 
 """

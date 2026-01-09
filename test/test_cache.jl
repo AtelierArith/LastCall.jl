@@ -6,57 +6,57 @@ using Test
 @testset "Compilation Caching" begin
     # Clear cache before testing
     clear_cache()
-    
+
     @testset "Cache Directory Management" begin
         cache_dir = LastCall.get_cache_dir()
         @test isdir(cache_dir)
         @test occursin("LastCall", cache_dir)
-        
+
         metadata_dir = LastCall.get_metadata_dir()
         @test isdir(metadata_dir)
     end
-    
+
     @testset "Cache Key Generation" begin
         code1 = """
         #[no_mangle]
         pub extern "C" fn test1() -> i32 { 42 }
         """
-        
+
         code2 = """
         #[no_mangle]
         pub extern "C" fn test2() -> i32 { 42 }
         """
-        
+
         compiler = LastCall.get_default_compiler()
-        
+
         key1 = LastCall.generate_cache_key(code1, compiler)
         key2 = LastCall.generate_cache_key(code2, compiler)
-        
+
         @test key1 != key2  # Different code should produce different keys
         @test length(key1) == 64  # SHA256 produces 64 hex characters
         @test length(key2) == 64
-        
+
         # Same code should produce same key
         key1_again = LastCall.generate_cache_key(code1, compiler)
         @test key1 == key1_again
     end
-    
+
     @testset "Cache Operations" begin
         # Test cache size
         initial_size = get_cache_size()
         @test initial_size >= 0
-        
+
         # Test listing cached libraries (should be empty initially)
         cached_libs = list_cached_libraries()
         @test isa(cached_libs, Vector{String})
     end
-    
+
     # Only run rustc tests if rustc is available
     if LastCall.check_rustc_available()
         @testset "Cache Hit/Miss" begin
             # Clear cache
             clear_cache()
-            
+
             # First compilation (cache miss)
             rust"""
             #[no_mangle]
@@ -64,20 +64,20 @@ using Test
                 a + b
             }
             """
-            
+
             # Call the function to ensure it works
             result1 = @rust cached_add(Int32(10), Int32(20))::Int32
             @test result1 == 30
-            
+
             # Check that cache was created
             cached_libs = list_cached_libraries()
             @test length(cached_libs) > 0
-            
+
             # Clear in-memory cache
             LastCall.unload_all_libraries()
             empty!(LastCall.RUST_LIBRARIES)
             LastCall.CURRENT_LIB[] = ""
-            
+
             # Second compilation (should use cache)
             rust"""
             #[no_mangle]
@@ -85,61 +85,61 @@ using Test
                 a + b
             }
             """
-            
+
             # Should still work
             result2 = @rust cached_add(Int32(15), Int32(25))::Int32
             @test result2 == 40
         end
-        
+
         @testset "Cache Validation" begin
             code = """
             #[no_mangle]
             pub extern "C" fn validation_test() -> i32 { 100 }
             """
-            
+
             compiler = LastCall.get_default_compiler()
             cache_key = LastCall.generate_cache_key(code, compiler)
-            
+
             # Test validation with non-existent cache
             @test !LastCall.is_cache_valid(cache_key, code, compiler)
-            
+
             # After compilation, cache should be valid
             rust"""
             #[no_mangle]
             pub extern "C" fn validation_test() -> i32 { 100 }
             """
-            
+
             wrapped_code = LastCall.wrap_rust_code(code)
             cache_key = LastCall.generate_cache_key(wrapped_code, compiler)
             @test LastCall.is_cache_valid(cache_key, wrapped_code, compiler)
         end
-        
+
         @testset "Cache Cleanup" begin
             # Test cleanup function exists and runs without error
             removed_count = cleanup_old_cache(0)  # Remove all files older than 0 days
             @test removed_count >= 0
-            
+
             # Test cache size
             cache_size = get_cache_size()
             @test cache_size >= 0
         end
-        
+
         @testset "Cache Clear" begin
             # Ensure we have some cache
             rust"""
             #[no_mangle]
             pub extern "C" fn clear_test() -> i32 { 999 }
             """
-            
+
             cached_before = list_cached_libraries()
             @test length(cached_before) > 0
-            
+
             # Clear cache
             clear_cache()
-            
+
             cached_after = list_cached_libraries()
             @test length(cached_after) == 0
-            
+
             # Cache size should be 0
             @test get_cache_size() == 0
         end

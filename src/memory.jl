@@ -54,9 +54,9 @@ function create_rust_box(value::T) where T
     if !is_rust_helpers_available()
         error("Rust helpers library not loaded. Cannot create RustBox. Please compile deps/rust_helpers.")
     end
-    
+
     lib = get_rust_helpers_lib()
-    
+
     # Dispatch based on type - use dlsym to get function pointer
     if T == Int32
         fn_ptr = Libdl.dlsym(lib, :rust_box_new_i32)
@@ -92,14 +92,14 @@ function drop_rust_box(box::RustBox{T}) where T
     if box.dropped || box.ptr == C_NULL
         return nothing
     end
-    
+
     lib = get_rust_helpers_lib()
     if lib === nothing
         @warn "Rust helpers library not loaded. Cannot properly drop RustBox."
         box.dropped = true
         return nothing
     end
-    
+
     # Dispatch based on type
     if T == Int32
         fn_ptr = Libdl.dlsym(lib, :rust_box_drop_i32)
@@ -121,7 +121,7 @@ function drop_rust_box(box::RustBox{T}) where T
         fn_ptr = Libdl.dlsym(lib, :rust_box_drop)
         ccall(fn_ptr, Cvoid, (Ptr{Cvoid},), box.ptr)
     end
-    
+
     box.dropped = true
     box.ptr = C_NULL
     return nothing
@@ -146,9 +146,9 @@ function create_rust_rc(value::T) where T
     if !is_rust_helpers_available()
         error("Rust helpers library not loaded. Cannot create RustRc. Please compile deps/rust_helpers.")
     end
-    
+
     lib = get_rust_helpers_lib()
-    
+
     if T == Int32
         fn_ptr = Libdl.dlsym(lib, :rust_rc_new_i32)
         ptr = ccall(fn_ptr, Ptr{Cvoid}, (Int32,), value)
@@ -171,13 +171,13 @@ function clone(rc::RustRc{T}) where T
     if rc.dropped || rc.ptr == C_NULL
         error("Cannot clone a dropped RustRc")
     end
-    
+
     if !is_rust_helpers_available()
         error("Rust helpers library not loaded. Cannot clone RustRc.")
     end
-    
+
     lib = get_rust_helpers_lib()
-    
+
     # For now, we'll use a simple approach
     # In production, type-specific clone functions should be used
     fn_ptr = Libdl.dlsym(lib, :rust_rc_clone)
@@ -194,14 +194,14 @@ function drop_rust_rc(rc::RustRc{T}) where T
     if rc.dropped || rc.ptr == C_NULL
         return nothing
     end
-    
+
     lib = get_rust_helpers_lib()
     if lib === nothing
         @warn "Rust helpers library not loaded. Cannot properly drop RustRc."
         rc.dropped = true
         return nothing
     end
-    
+
     if T == Int32
         fn_ptr = Libdl.dlsym(lib, :rust_rc_drop_i32)
         ccall(fn_ptr, Cvoid, (Ptr{Cvoid},), rc.ptr)
@@ -211,7 +211,7 @@ function drop_rust_rc(rc::RustRc{T}) where T
     else
         error("Unsupported type for RustRc drop: $T")
     end
-    
+
     rc.dropped = true
     rc.ptr = C_NULL
     return nothing
@@ -236,9 +236,9 @@ function create_rust_arc(value::T) where T
     if !is_rust_helpers_available()
         error("Rust helpers library not loaded. Cannot create RustArc. Please compile deps/rust_helpers.")
     end
-    
+
     lib = get_rust_helpers_lib()
-    
+
     if T == Int32
         fn_ptr = Libdl.dlsym(lib, :rust_arc_new_i32)
         ptr = ccall(fn_ptr, Ptr{Cvoid}, (Int32,), value)
@@ -265,13 +265,13 @@ function clone(arc::RustArc{T}) where T
     if arc.dropped || arc.ptr == C_NULL
         error("Cannot clone a dropped RustArc")
     end
-    
+
     if !is_rust_helpers_available()
         error("Rust helpers library not loaded. Cannot clone RustArc.")
     end
-    
+
     lib = get_rust_helpers_lib()
-    
+
     # Clone the Arc (increments reference count)
     fn_ptr = Libdl.dlsym(lib, :rust_arc_clone)
     new_ptr = ccall(fn_ptr, Ptr{Cvoid}, (Ptr{Cvoid},), arc.ptr)
@@ -287,14 +287,14 @@ function drop_rust_arc(arc::RustArc{T}) where T
     if arc.dropped || arc.ptr == C_NULL
         return nothing
     end
-    
+
     lib = get_rust_helpers_lib()
     if lib === nothing
         @warn "Rust helpers library not loaded. Cannot properly drop RustArc."
         arc.dropped = true
         return nothing
     end
-    
+
     if T == Int32
         fn_ptr = Libdl.dlsym(lib, :rust_arc_drop_i32)
         ccall(fn_ptr, Cvoid, (Ptr{Cvoid},), arc.ptr)
@@ -307,7 +307,7 @@ function drop_rust_arc(arc::RustArc{T}) where T
     else
         error("Unsupported type for RustArc drop: $T")
     end
-    
+
     arc.dropped = true
     arc.ptr = C_NULL
     return nothing
