@@ -699,7 +699,8 @@ function emit_julia_definitions(info::RustStructInfo)
                     if field === $(QuoteNode(Symbol(field_name)))
                         lib = self.lib_name
                         func_ptr = get_function_pointer(lib, $getter_name)
-                        return call_rust_function(func_ptr, $jl_field_type, self.ptr)
+                        field_type = julia_sym_to_type($(QuoteNode(jl_field_type)))
+                        return call_rust_function(func_ptr, field_type, self.ptr)
                     else
                         return getfield(self, field)
                     end
