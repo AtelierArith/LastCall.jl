@@ -65,9 +65,6 @@ Use the `@rust` macro to call functions:
 # With type inference
 result = @rust add(Int32(10), Int32(20))::Int32
 println(result)  # => 30
-
-# Or with explicit return type
-result = @rust add(10i32, 20i32)::Int32
 ```
 
 ### Step 3: Define Multiple Functions
@@ -89,7 +86,7 @@ pub extern "C" fn subtract(a: i64, b: i64) -> i64 {
 
 # Usage
 product = @rust multiply(3.0, 4.0)::Float64  # => 12.0
-difference = @rust subtract(100i64, 30i64)::Int64  # => 70
+difference = @rust subtract(100, 30)::Int64  # => 70
 ```
 
 ## Understanding the Type System
