@@ -9,6 +9,7 @@ makedocs(
         prettyurls = get(ENV, "CI", nothing) == "true",
         canonical = "https://atelierarith.github.io/LastCall.jl",
         assets = String[],
+        edit_link = :commit,
     ),
     pages = [
         "Home" => "index.md",
