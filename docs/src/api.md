@@ -257,9 +257,9 @@ end
 These functions are exported for testing purposes but are considered internal.
 They are wrappers around internal implementation functions.
 
-## Internal Functions
+## Internal Functions and Types
 
-The following functions are internal implementation details and are not part of the public API.
+The following functions and types are internal implementation details and are not part of the public API.
 They are documented here for completeness but should not be used directly by users.
 
 ```@autodocs
@@ -267,7 +267,7 @@ Modules = [LastCall]
 Filter = t -> begin
     # Exclude items already documented in @docs blocks above
     excluded_names = [
-        # Types
+        # Types (documented in @docs blocks)
         :RustResult, :RustOption, :RustBox, :RustRc, :RustArc, :RustVec, :RustSlice,
         :RustPtr, :RustRef, :RustString, :RustStr,
         :RustError, :CompilationError, :RuntimeError, :CargoBuildError, :DependencyResolutionError,
@@ -306,7 +306,8 @@ Filter = t -> begin
     catch
         return false
     end
-    # Only include if not in excluded list and name starts with underscore (internal)
-    return !(name in excluded_names) && startswith(string(name), "_")
+    # Include all documented items that are not in the excluded list
+    # This includes internal functions, types, and Base method extensions
+    return !(name in excluded_names)
 end
 ```
