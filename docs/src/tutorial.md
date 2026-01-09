@@ -40,13 +40,15 @@ Pkg.build("LastCall")
 
 ## Basic Usage
 
+```@setup tutorial
+using LastCall
+```
+
 ### Step 1: Define and Compile Rust Code
 
 Use the `rust""` string literal to define and compile Rust code:
 
-```julia
-using LastCall
-
+```@example tutorial
 rust"""
 #[no_mangle]
 pub extern "C" fn add(a: i32, b: i32) -> i32 {
@@ -61,7 +63,7 @@ This code is automatically compiled and loaded as a shared library.
 
 Use the `@rust` macro to call functions:
 
-```julia
+```@example tutorial
 # With type inference
 result = @rust add(Int32(10), Int32(20))::Int32
 println(result)  # => 30
@@ -71,7 +73,7 @@ println(result)  # => 30
 
 You can define multiple functions in the same `rust""` block:
 
-```julia
+```@example tutorial
 rust"""
 #[no_mangle]
 pub extern "C" fn multiply(x: f64, y: f64) -> f64 {
@@ -115,7 +117,7 @@ LastCall.jl automatically maps Rust types to Julia types:
 
 LastCall.jl tries to infer return types from argument types, but explicit specification is recommended:
 
-```julia
+```@example tutorial
 # Not recommended - relies on inference (works but not recommended)
 result = @rust add(10i32, 20i32)
 
@@ -125,7 +127,7 @@ result = @rust add(10i32, 20i32)::Int32
 
 ### Boolean Values
 
-```julia
+```@example tutorial
 rust"""
 #[no_mangle]
 pub extern "C" fn is_positive(x: i32) -> bool {
@@ -143,7 +145,7 @@ pub extern "C" fn is_positive(x: i32) -> bool {
 
 When Rust functions expect `*const u8` (C strings), you can pass Julia `String` directly:
 
-```julia
+```@example tutorial
 rust"""
 #[no_mangle]
 pub extern "C" fn string_length(s: *const u8) -> u32 {
@@ -159,7 +161,7 @@ len = @rust string_length("世界")::UInt32   # => 6 (UTF-8 bytes)
 
 ### UTF-8 String Handling
 
-```julia
+```@example tutorial
 rust"""
 #[no_mangle]
 pub extern "C" fn count_chars(s: *const u8) -> u32 {
@@ -180,7 +182,7 @@ count = @rust count_chars("世界")::UInt32     # => 2 (characters, not bytes)
 
 Rust's `Result<T, E>` type is represented as `RustResult{T, E}` in Julia:
 
-```julia
+```@example tutorial
 rust"""
 #[no_mangle]
 pub extern "C" fn divide(a: i32, b: i32) -> i32 {
@@ -202,7 +204,7 @@ end
 
 For a more Rust-like approach, you can define functions that return `Result` types:
 
-```julia
+```@example tutorial
 # Create RustResult manually
 ok_result = RustResult{Int32, String}(true, Int32(42))
 is_ok(ok_result)  # => true
@@ -217,7 +219,7 @@ unwrap_or(err_result, Int32(0))  # => 0
 
 Use `result_to_exception` to convert `Result` to Julia exceptions:
 
-```julia
+```@example tutorial
 err_result = RustResult{Int32, String}(false, "division by zero")
 try
     value = result_to_exception(err_result)
@@ -357,7 +359,7 @@ pub extern "C" fn compute(x: i32) -> i32 {
 
 ### Cache Management
 
-```julia
+```@example tutorial
 # Check cache size
 size = get_cache_size()
 println("Cache size: $size bytes")
@@ -387,7 +389,7 @@ This compares performance of Julia native, `@rust`, and `@rust_llvm`.
 
 ### 1. Always Specify Types Explicitly
 
-```julia
+```@example tutorial
 # Recommended
 result = @rust add(10i32, 20i32)::Int32
 
@@ -397,7 +399,7 @@ result = @rust add(10i32, 20i32)
 
 ### 2. Proper Error Handling
 
-```julia
+```@example tutorial
 # Use Result type
 result = some_rust_function()
 if is_err(result)
@@ -411,7 +413,7 @@ value = unwrap(result)
 
 When using ownership types, always call `drop!` appropriately:
 
-```julia
+```@example tutorial
 box = RustBox{Int32}(ptr)
 try
     # Use box
@@ -428,7 +430,7 @@ When using the same Rust code multiple times, caching is automatically leveraged
 
 If issues occur, try clearing the cache and recompiling:
 
-```julia
+```@example tutorial
 clear_cache()
 ```
 

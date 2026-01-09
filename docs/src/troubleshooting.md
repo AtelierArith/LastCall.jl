@@ -2,6 +2,10 @@
 
 This guide covers common issues and solutions when using LastCall.jl.
 
+```@setup troubleshooting
+using LastCall
+```
+
 ## Installation and Setup
 
 ### Problem: rustc not found
@@ -106,7 +110,7 @@ error: expected one of ...
    ```
 
 3. Check error message in detail:
-   ```julia
+   ```@example troubleshooting
    # Clear cache and recompile
    clear_cache()
    rust"""
@@ -145,7 +149,7 @@ ERROR: type mismatch
    ```
 
 2. Use correct types on Julia side:
-   ```julia
+   ```@example troubleshooting
    # Correct
    @rust add(Int32(10), Int32(20))::Int32
 
@@ -169,7 +173,7 @@ Function 'my_function' not found in library
 1. Check function name spelling
 2. Ensure `#[no_mangle]` attribute is present
 3. Verify library compiled correctly:
-   ```julia
+   ```@example troubleshooting
    clear_cache()
    rust"""
    #[no_mangle]
@@ -187,7 +191,7 @@ signal (11): Segmentation fault
 **Solution:**
 
 1. Check pointer validity:
-   ```julia
+   ```@example troubleshooting
    # Dangerous: invalid pointer
    ptr = Ptr{Cvoid}(0x1000)
 
@@ -200,7 +204,7 @@ signal (11): Segmentation fault
    ```
 
 2. Check array bounds:
-   ```julia
+   ```@example troubleshooting
    arr = [1, 2, 3]
    len = length(arr)
    # Don't access beyond len
@@ -225,7 +229,7 @@ invalid UTF-8 sequence
    ```
 
 2. Pass strings correctly from Julia:
-   ```julia
+   ```@example troubleshooting
    # UTF-8 strings are handled automatically
    @rust process_string("こんにちは")::UInt32
    ```
@@ -237,7 +241,7 @@ invalid UTF-8 sequence
 **Solution:**
 
 1. Specify types explicitly:
-   ```julia
+   ```@example troubleshooting
    # Recommended
    result = @rust add(10i32, 20i32)::Int32
 
@@ -246,7 +250,7 @@ invalid UTF-8 sequence
    ```
 
 2. Explicitly specify argument types:
-   ```julia
+   ```@example troubleshooting
    a = Int32(10)
    b = Int32(20)
    result = @rust add(a, b)::Int32
@@ -257,7 +261,7 @@ invalid UTF-8 sequence
 **Solution:**
 
 1. Use correct pointer types:
-   ```julia
+   ```@example troubleshooting
    # Rust: *const i32
    # Julia: Ptr{Int32}
 
@@ -266,7 +270,7 @@ invalid UTF-8 sequence
    ```
 
 2. For C strings, use `String` directly:
-   ```julia
+   ```@example troubleshooting
    # Rust: *const u8
    # Julia: String (auto-converted)
    @rust process_string("hello")::UInt32
@@ -279,7 +283,7 @@ invalid UTF-8 sequence
 **Solution:**
 
 1. For ownership types, call `drop!` properly:
-   ```julia
+   ```@example troubleshooting
    box = RustBox{Int32}(ptr)
    try
        # Use box
@@ -382,7 +386,7 @@ double free or corruption
 
 A: Yes. Each `rust""` block is compiled as an independent library:
 
-```julia
+```@example troubleshooting
 rust"""
 // Library 1
 #[no_mangle]
@@ -415,7 +419,7 @@ A: Clear the cache when:
 - After compilation errors occur
 - When unexpected behavior occurs
 
-```julia
+```@example troubleshooting
 clear_cache()
 ```
 
@@ -434,7 +438,7 @@ A:
 2. Use `result_to_exception` on Julia side
 3. Or use `unwrap_or` for default values
 
-```julia
+```@example troubleshooting
 result = some_rust_function()
 value = unwrap_or(result, default_value)
 ```
@@ -443,14 +447,14 @@ value = unwrap_or(result, default_value)
 
 ### 1. Enable verbose logging
 
-```julia
+```@example troubleshooting
 using Logging
 global_logger(ConsoleLogger(stderr, Logging.Debug))
 ```
 
 ### 2. Clear cache
 
-```julia
+```@example troubleshooting
 clear_cache()
 ```
 
@@ -467,7 +471,7 @@ rustc --crate-type cdylib test.rs
 
 ### 4. Check library status
 
-```julia
+```@example troubleshooting
 # List cached libraries
 list_cached_libraries()
 
@@ -477,7 +481,7 @@ get_cache_size()
 
 ### 5. Check type information
 
-```julia
+```@example troubleshooting
 # Check type mapping
 rusttype_to_julia(:i32)  # => Int32
 juliatype_to_rust(Int32)  # => "i32"

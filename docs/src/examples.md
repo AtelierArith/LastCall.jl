@@ -2,6 +2,10 @@
 
 This document provides practical examples of using LastCall.jl.
 
+```@setup examples
+using LastCall
+```
+
 ## Table of Contents
 
 1. [Numerical Computations](#numerical-computations)
@@ -15,8 +19,7 @@ This document provides practical examples of using LastCall.jl.
 
 ### Basic Math Functions
 
-```julia
-using LastCall
+```@example examples
 
 rust"""
 #[no_mangle]
@@ -35,7 +38,7 @@ result = @rust power(2.0, 10)::Float64  # => 1024.0
 
 ### Fibonacci Sequence
 
-```julia
+```@example examples
 rust"""
 #[no_mangle]
 pub extern "C" fn fibonacci(n: u32) -> u64 {
@@ -63,7 +66,7 @@ fib_20 = @rust fibonacci(UInt32(20))::UInt64  # => 6765
 
 ### Statistical Calculations
 
-```julia
+```@example examples
 rust"""
 #[no_mangle]
 pub extern "C" fn calculate_mean(data: *const f64, len: usize) -> f64 {
@@ -103,7 +106,7 @@ println("Mean: $(stats.mean), StdDev: $(stats.stddev)")
 
 ### String Search and Replacement
 
-```julia
+```@example examples
 rust"""
 #[no_mangle]
 pub extern "C" fn find_substring(haystack: *const u8, needle: *const u8) -> i32 {
@@ -132,7 +135,7 @@ pos = @rust find_substring("hello world", "xyz")::Int32    # => -1
 
 ### Word Counting
 
-```julia
+```@example examples
 rust"""
 #[no_mangle]
 pub extern "C" fn count_words(text: *const u8) -> u32 {
@@ -152,7 +155,7 @@ word_count = @rust count_words("The quick brown fox")::UInt32  # => 4
 
 ### UTF-8 String Processing
 
-```julia
+```@example examples
 rust"""
 #[no_mangle]
 pub extern "C" fn count_utf8_chars(s: *const u8) -> u32 {
@@ -182,7 +185,7 @@ char_count = @rust count_utf8_chars("こんにちは")::UInt32  # => 5
 
 ### Array Operations
 
-```julia
+```@example examples
 rust"""
 #[no_mangle]
 pub extern "C" fn sum_array(data: *const i32, len: usize) -> i64 {
@@ -216,7 +219,7 @@ println("Sum: $(result.sum), Max: $(result.max)")
 
 ### In-place Sorting
 
-```julia
+```@example examples
 rust"""
 #[no_mangle]
 pub extern "C" fn sort_array(data: *mut i32, len: usize) {
@@ -243,8 +246,7 @@ println(arr)  # => [1, 2, 5, 8, 9]
 
 ### Julia vs Rust: Numerical Computation
 
-```julia
-using LastCall
+```@example examples
 using BenchmarkTools
 
 # Rust implementation
@@ -276,7 +278,7 @@ println("Rust (@rust):")
 
 ### String Processing Performance
 
-```julia
+```@example examples
 rust"""
 #[no_mangle]
 pub extern "C" fn rust_count_words(text: *const u8) -> u32 {
@@ -307,7 +309,7 @@ println("Rust (@rust):")
 
 ### Cryptographic Hash Calculation
 
-```julia
+```@example examples
 rust"""
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -330,7 +332,7 @@ println("Hash: $hash_value")
 
 ### Image Processing (Simplified)
 
-```julia
+```@example examples
 rust"""
 #[no_mangle]
 pub extern "C" fn grayscale_image(
@@ -374,7 +376,7 @@ end
 
 ### Network Processing (Simplified)
 
-```julia
+```@example examples
 rust"""
 #[no_mangle]
 pub extern "C" fn validate_ip_address(ip: *const u8) -> bool {
@@ -407,7 +409,7 @@ is_valid = @rust validate_ip_address("999.999.999.999")::Bool  # => false
 
 ### Data Compression (Simplified)
 
-```julia
+```@example examples
 rust"""
 #[no_mangle]
 pub extern "C" fn simple_compress(
@@ -474,7 +476,7 @@ println("Compressed: $(length(compressed)) bytes")
 
 When working with pointers, ensure Julia memory remains valid:
 
-```julia
+```@example examples
 function safe_array_operation(arr::Vector{Int32})
     if isempty(arr)
         return 0
@@ -493,7 +495,7 @@ end
 
 ### 2. Error Handling
 
-```julia
+```@example examples
 rust"""
 #[no_mangle]
 pub extern "C" fn safe_divide(a: i32, b: i32) -> i32 {
@@ -524,7 +526,7 @@ end
 
 When issues occur:
 
-```julia
+```@example examples
 # Clear cache
 clear_cache()
 

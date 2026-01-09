@@ -2,6 +2,10 @@
 
 LastCall.jl now supports calling generic Rust functions from Julia. This document explains how to use this feature.
 
+```@setup generics
+using LastCall
+```
+
 ## Overview
 
 Generic functions in Rust use type parameters (e.g., `fn identity<T>(x: T) -> T`). LastCall.jl automatically:
@@ -16,8 +20,7 @@ Generic functions in Rust use type parameters (e.g., `fn identity<T>(x: T) -> T`
 
 When you define a generic function in a `rust""` block, LastCall.jl automatically detects and registers it:
 
-```julia
-using LastCall
+```@example generics
 
 rust"""
 #[no_mangle]
@@ -36,7 +39,7 @@ result = @rust identity(Float64(3.14))::Float64  # => 3.14
 
 You can also manually register generic functions:
 
-```julia
+```@example generics
 using LastCall
 
 code = """
@@ -58,7 +61,7 @@ result = call_generic_function("add", Int32(10), Int32(20))  # => 30
 
 When you call a generic function, LastCall.jl infers type parameters from the argument types:
 
-```julia
+```@example generics
 # For function: fn identity<T>(x: T) -> T
 # Called with: identity(Int32(42))
 # Type parameter T is inferred as Int32
@@ -81,7 +84,7 @@ The specialized function is compiled and cached. Subsequent calls with the same 
 
 ### Multiple Type Parameters
 
-```julia
+```@example generics
 rust"""
 #[no_mangle]
 pub extern "C" fn pair<T, U>(a: T, b: U) -> T {
@@ -97,7 +100,7 @@ result = @rust pair(Int32(10), Float64(3.14))::Int32  # => 10
 
 You can also explicitly specify type parameters:
 
-```julia
+```@example generics
 using LastCall
 
 # Register generic function
@@ -158,7 +161,7 @@ More complex inference (e.g., inferring from return type) is not yet supported.
 
 ### Example 1: Simple Generic Function
 
-```julia
+```@example generics
 using LastCall
 
 rust"""
@@ -175,7 +178,7 @@ pub extern "C" fn identity<T>(x: T) -> T {
 
 ### Example 2: Multiple Type Parameters
 
-```julia
+```@example generics
 rust"""
 #[no_mangle]
 pub extern "C" fn first<T, U>(a: T, b: U) -> T {
@@ -188,7 +191,7 @@ result = @rust first(Int32(10), Float64(20.0))::Int32  # => 10
 
 ### Example 3: Manual Registration and Monomorphization
 
-```julia
+```@example generics
 using LastCall
 
 code = """

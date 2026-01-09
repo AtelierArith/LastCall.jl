@@ -2,6 +2,10 @@
 
 LastCall.jl provides automatic struct mapping through the `#[derive(JuliaStruct)]` attribute, which allows you to seamlessly use Rust structs as first-class Julia objects.
 
+```@setup struct_mapping
+using LastCall
+```
+
 ## Overview
 
 When you add `#[derive(JuliaStruct)]` to a Rust struct, LastCall.jl automatically:
@@ -15,8 +19,7 @@ When you add `#[derive(JuliaStruct)]` to a Rust struct, LastCall.jl automaticall
 
 ### Simple Struct
 
-```julia
-using LastCall
+```@example struct_mapping
 
 rust"""
 #[derive(JuliaStruct)]
@@ -54,8 +57,7 @@ println(dist)  # => 5.830951894845301
 
 ### With Clone Support
 
-```julia
-using LastCall
+```@example struct_mapping
 
 rust"""
 #[derive(JuliaStruct, Clone)]
@@ -104,7 +106,7 @@ The `#[derive(JuliaStruct)]` attribute supports additional derive options:
 
 ### Example with Multiple Traits
 
-```julia
+```@example struct_mapping
 rust"""
 #[derive(JuliaStruct, Clone)]
 pub struct Config {
@@ -133,7 +135,7 @@ When `#[derive(JuliaStruct)]` is present, LastCall.jl automatically generates:
 - **Getters**: Access fields using `obj.field_name`
 - **Setters**: Modify fields using `obj.field_name = value`
 
-```julia
+```@example struct_mapping
 rust"""
 #[derive(JuliaStruct)]
 pub struct Rectangle {
@@ -184,7 +186,7 @@ Field types are automatically mapped from Rust to Julia:
 
 Generic structs are also supported:
 
-```julia
+```@example struct_mapping
 rust"""
 #[derive(JuliaStruct)]
 pub struct Pair<T> {
@@ -218,7 +220,7 @@ Structs created with `#[derive(JuliaStruct)]` are automatically managed:
 - **Safe memory**: No manual memory management required
 - **Reference counting**: For `Rc` and `Arc` types, reference counting is handled automatically
 
-```julia
+```@example struct_mapping
 rust"""
 #[derive(JuliaStruct)]
 pub struct Resource {
@@ -253,7 +255,7 @@ use_resource()  # Prints: "Dropping resource 1"
 
 All `pub fn` methods in `impl` blocks are automatically bound:
 
-```julia
+```@example struct_mapping
 rust"""
 #[derive(JuliaStruct)]
 pub struct Calculator {
@@ -295,7 +297,7 @@ println(calc.get_value())  # => 0.0
 
 Static methods (methods without `self`) are also supported:
 
-```julia
+```@example struct_mapping
 rust"""
 #[derive(JuliaStruct)]
 pub struct MathUtils;
@@ -411,7 +413,7 @@ pub struct Inner {
 
 ### Complete Example: 2D Vector
 
-```julia
+```@example struct_mapping
 using LastCall
 
 rust"""
