@@ -1,7 +1,6 @@
 # LastCall.jl
 
 [![CI](https://github.com/atelierarith/LastCall.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/atelierarith/LastCall.jl/actions/workflows/CI.yml)
-[![Code Style: Blue](https://img.shields.io/badge/code%20style-blue-4495d1.svg)](https://github.com/invenia/BlueStyle)
 
 **LastCall.jl** is a Foreign Function Interface (FFI) package for calling Rust code directly from Julia, inspired by [Cxx.jl](https://github.com/JuliaInterop/Cxx.jl).
 
