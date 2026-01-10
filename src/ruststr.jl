@@ -1031,8 +1031,8 @@ function _call_irust_function(lib_name::String, func_name::String, ret_type::Typ
         # Call using the codegen infrastructure with explicit return type
         result = call_rust_function(func_ptr, ret_type, args...)
 
-        # Convert C bool (i32) to Julia Bool if needed
-        # Rust bool is represented as i32 in C ABI (0 = false, non-zero = true)
+        # Safety check: Convert integer to Bool if needed (should already be handled by codegen.jl)
+        # Rust bool is represented as UInt8 in C ABI (0 = false, non-zero = true)
         if ret_type == Bool
             if isa(result, Integer)
                 return Bool(result != 0)
