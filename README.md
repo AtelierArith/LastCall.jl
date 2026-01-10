@@ -12,7 +12,7 @@
 ### Phase 1: C-Compatible ABI ✅
 - **`@rust` macro**: Call Rust functions directly from Julia
 - **`rust""` string literal**: Compile and load Rust code as shared libraries
-- **`@irust` macro**: Execute Rust code at function scope
+- **`@irust` macro**: Execute Rust code at function scope with `$var` variable binding
 - **Type mapping**: Automatic conversion between Rust and Julia types
 - **Result/Option support**: Handle Rust's `Result<T, E>` and `Option<T>` types
 - **String support**: Pass Julia strings to Rust functions expecting C strings
@@ -72,12 +72,12 @@ This will compile the Rust helpers library that provides FFI functions for owner
 
 ## Quick Start
 
-### Basic Usage
+### 1. Define and Call Rust Functions
 
 ```julia
 using LastCall
 
-# Define and compile Rust code
+# Define a Rust function
 rust"""
 #[no_mangle]
 pub extern "C" fn add(a: i32, b: i32) -> i32 {
@@ -85,56 +85,129 @@ pub extern "C" fn add(a: i32, b: i32) -> i32 {
 }
 """
 
-# Call the Rust function
-result = @rust add(Int32(10), Int32(20))::Int32
-println(result)  # => 30
+# Call it from Julia
+@rust add(Int32(10), Int32(20))::Int32  # => 30
 ```
 
-### With Explicit Return Type
+### 2. Inline Rust with `@irust`
+
+Execute Rust code directly with automatic variable binding:
 
 ```julia
-rust"""
-#[no_mangle]
-pub extern "C" fn multiply(x: f64, y: f64) -> f64 {
-    x * y
-}
-"""
-
-# Specify return type explicitly
-result = @rust multiply(3.0, 4.0)::Float64
-println(result)  # => 12.0
-```
-
-### Boolean Functions
-
-```julia
-rust"""
-#[no_mangle]
-pub extern "C" fn is_positive(x: i32) -> bool {
-    x > 0
-}
-"""
-
-@rust is_positive(Int32(5))::Bool   # => true
-@rust is_positive(Int32(-5))::Bool # => false
-```
-
-### Function Scope Execution (`@irust`)
-
-The `@irust` macro allows you to execute Rust code at function scope:
-
-```julia
-function double(x)
-    @irust("arg1 * 2", x)
+function compute(x, y)
+    @irust("\$x * \$y + 10")
 end
 
-result = double(21)  # => 42
+compute(Int32(3), Int32(4))  # => 22
 ```
 
-**Note**: Current limitations:
-- Arguments must be passed explicitly
-- Code should use `arg1`, `arg2`, etc. to reference arguments
-- Return type is inferred from the code
+### 3. Use External Crates
+
+Leverage the Rust ecosystem with automatic Cargo integration:
+
+```julia
+rust"""
+// cargo-deps: rand = "0.8"
+
+use rand::Rng;
+
+#[no_mangle]
+pub extern "C" fn random_number() -> i32 {
+    rand::thread_rng().gen_range(1..=100)
+}
+"""
+
+@rust random_number()::Int32  # => random number 1-100
+```
+
+### 4. Rust Structs as Julia Objects
+
+Define Rust structs and use them as first-class Julia types:
+
+```julia
+rust"""
+pub struct Counter {
+    value: i32,
+}
+
+impl Counter {
+    pub fn new(initial: i32) -> Self {
+        Self { value: initial }
+    }
+
+    pub fn increment(&mut self) {
+        self.value += 1;
+    }
+
+    pub fn get(&self) -> i32 {
+        self.value
+    }
+}
+"""
+
+counter = Counter(0)
+increment(counter)
+increment(counter)
+get(counter)  # => 2
+```
+
+### More Examples
+
+```julia
+# Float operations
+rust"""
+#[no_mangle]
+pub extern "C" fn circle_area(radius: f64) -> f64 {
+    std::f64::consts::PI * radius * radius
+}
+"""
+@rust circle_area(2.0)::Float64  # => 12.566370614359172
+
+# Boolean functions
+rust"""
+#[no_mangle]
+pub extern "C" fn is_even(n: i32) -> bool {
+    n % 2 == 0
+}
+"""
+@rust is_even(Int32(42))::Bool  # => true
+
+# Multiple variables with @irust
+function quadratic(a, b, c, x)
+    @irust("\$a * \$x * \$x + \$b * \$x + \$c")
+end
+quadratic(1.0, 2.0, 1.0, 3.0)  # => 16.0 (x² + 2x + 1 at x=3)
+```
+
+### 5. Image Processing with Rust
+
+Process images using Rust for performance-critical operations:
+
+```julia
+using LastCall
+using Images
+
+# Define Rust grayscale conversion
+rust"""
+#[no_mangle]
+pub extern "C" fn grayscale_image(pixels: *mut u8, width: usize, height: usize) {
+    let slice = unsafe { std::slice::from_raw_parts_mut(pixels, width * height * 3) };
+    for i in 0..(width * height) {
+        let r = slice[i * 3] as f32;
+        let g = slice[i * 3 + 1] as f32;
+        let b = slice[i * 3 + 2] as f32;
+        let gray = (0.299 * r + 0.587 * g + 0.114 * b) as u8;
+        slice[i * 3] = gray;
+        slice[i * 3 + 1] = gray;
+        slice[i * 3 + 2] = gray;
+    }
+}
+"""
+
+# Process image data
+pixels = vec(rand(UInt8, 256 * 256 * 3))
+@rust grayscale_image(pointer(pixels), UInt(256), UInt(256))::Cvoid
+```
 
 ## Type Mapping
 
@@ -579,6 +652,7 @@ LastCall.jl uses a multi-phase approach:
 - Supports basic types and `extern "C"` functions
 - SHA256-based compilation caching
 - String type support
+- `@irust` macro with `$var` variable binding syntax
 
 ### Phase 2: LLVM IR Integration ✅ (Complete)
 
@@ -621,7 +695,7 @@ LastCall.jl uses a multi-phase approach:
 - ✅ Automatic monomorphization
 - ✅ Type parameter inference from arguments
 - ✅ Caching of monomorphized instances
-- ⚠️ Trait bounds parsing is simplified (basic support)
+- ✅ Enhanced trait bounds parsing (inline bounds, where clauses, generic traits)
 
 **Phase 3 limitations:**
 - Cargo builds are cached but may take time on first use
@@ -649,7 +723,7 @@ LastCall.jl has completed **Phase 1, Phase 2, Phase 3, and Phase 4**. The packag
 - ✅ Basic type mapping
 - ✅ `rust""` string literal
 - ✅ `@rust` macro
-- ✅ `@irust` macro
+- ✅ `@irust` macro with `$var` variable binding
 - ✅ Result/Option types
 - ✅ Error handling (`RustError`, `result_to_exception`)
 - ✅ String type support
@@ -670,11 +744,11 @@ LastCall.jl has completed **Phase 1, Phase 2, Phase 3, and Phase 4**. The packag
 - ✅ Phase 4: Rust structs as Julia objects
 - ✅ Generic struct support with automatic monomorphization
 - ✅ Enhanced error handling with suggestions
+- ✅ Enhanced `@irust` with `$var` variable binding syntax
+- ✅ Enhanced trait bounds parsing for generics (inline bounds, where clauses, generic traits)
 
 **Planned:**
 - ⏳ Lifetime/borrow checker integration
-- ⏳ Enhanced `@irust` with better variable binding
-- ⏳ Enhanced trait bounds parsing for generics
 - ⏳ CI/CD pipeline and package distribution
 
 ## Examples

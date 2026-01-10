@@ -28,10 +28,12 @@ const MODULE_ACTIVE_LIB = Dict{Module, String}()
 Get the name of the currently active Rust library.
 """
 function get_current_library()
-    if isempty(CURRENT_LIB[])
-        error("No Rust library loaded. Use rust\"\"\"...\"\"\" to compile and load Rust code first.")
+    lock(REGISTRY_LOCK) do
+        if isempty(CURRENT_LIB[])
+            error("No Rust library loaded. Use rust\"\"\"...\"\"\" to compile and load Rust code first.")
+        end
+        return CURRENT_LIB[]
     end
-    return CURRENT_LIB[]
 end
 
 """
@@ -40,39 +42,84 @@ end
 Get the library handle for a named library.
 """
 function get_library_handle(name::String)
-    if !haskey(RUST_LIBRARIES, name)
-        error("Library '$name' not found. Available: $(keys(RUST_LIBRARIES))")
+    lock(REGISTRY_LOCK) do
+        if !haskey(RUST_LIBRARIES, name)
+            error("Library '$name' not found. Available: $(keys(RUST_LIBRARIES))")
+        end
+        return RUST_LIBRARIES[name][1]
     end
-    return RUST_LIBRARIES[name][1]
 end
 
 """
     get_function_pointer(lib_name::String, func_name::String) -> Ptr{Cvoid}
 
 Get a function pointer from a loaded library.
+
+If the function is not found in the specified library, searches all other
+loaded libraries as a fallback. This enables using functions from multiple
+`rust\"\"\"` blocks.
 """
 function get_function_pointer(lib_name::String, func_name::String)
     lock(REGISTRY_LOCK) do
-        if !haskey(RUST_LIBRARIES, lib_name)
-            error("Library '$lib_name' not found")
+        # First, try the specified library
+        if haskey(RUST_LIBRARIES, lib_name)
+            lib_handle, func_cache = RUST_LIBRARIES[lib_name]
+
+            # Check cache first
+            if haskey(func_cache, func_name)
+                return func_cache[func_name]
+            end
+
+            # Look up the function
+            func_ptr = Libdl.dlsym(lib_handle, func_name; throw_error=false)
+            if func_ptr !== nothing && func_ptr != C_NULL
+                # Cache it
+                func_cache[func_name] = func_ptr
+                return func_ptr
+            end
         end
 
-        lib_handle, func_cache = RUST_LIBRARIES[lib_name]
+        # Fallback: search all other loaded libraries
+        found_libs = String[]
+        found_ptr = C_NULL
 
-        # Check cache first
-        if haskey(func_cache, func_name)
-            return func_cache[func_name]
+        for (other_lib_name, (other_lib_handle, other_func_cache)) in RUST_LIBRARIES
+            if other_lib_name == lib_name
+                continue  # Already checked
+            end
+
+            # Check cache first
+            if haskey(other_func_cache, func_name)
+                push!(found_libs, other_lib_name)
+                found_ptr = other_func_cache[func_name]
+                continue
+            end
+
+            # Look up the function
+            func_ptr = Libdl.dlsym(other_lib_handle, func_name; throw_error=false)
+            if func_ptr !== nothing && func_ptr != C_NULL
+                # Cache it
+                other_func_cache[func_name] = func_ptr
+                push!(found_libs, other_lib_name)
+                found_ptr = func_ptr
+            end
         end
 
-        # Look up the function
-        func_ptr = Libdl.dlsym(lib_handle, func_name; throw_error=false)
-        if func_ptr === nothing || func_ptr == C_NULL
-            error("Function '$func_name' not found in library '$lib_name'")
+        if length(found_libs) == 1
+            # Found in exactly one other library - use it
+            @debug "Function '$func_name' found in library '$(found_libs[1])' (fallback search)"
+            return found_ptr
+        elseif length(found_libs) > 1
+            # Ambiguous - found in multiple libraries
+            error("Function '$func_name' found in multiple libraries: $(join(found_libs, ", ")). Please use a unique function name.")
+        else
+            # Not found anywhere
+            if haskey(RUST_LIBRARIES, lib_name)
+                error("Function '$func_name' not found in library '$lib_name' or any other loaded library")
+            else
+                error("Library '$lib_name' not found and function '$func_name' not found in any loaded library")
+            end
         end
-
-        # Cache it
-        func_cache[func_name] = func_ptr
-        return func_ptr
     end
 end
 
@@ -114,7 +161,9 @@ macro rust_str(code)
         $__module__.__LASTCALL_ACTIVE_LIB = lib_name
 
         # Track active library for macro expansion in this session
-        MODULE_ACTIVE_LIB[$__module__] = lib_name
+        lock(REGISTRY_LOCK) do
+            MODULE_ACTIVE_LIB[$__module__] = lib_name
+        end
 
         $(julia_defs...)
         lib_name
@@ -200,16 +249,16 @@ function _compile_and_load_rust(code::String, source_file::String, source_line::
             RUST_LIBRARIES[lib_name] = (lib_handle, Dict{String, Ptr{Cvoid}}())
             CURRENT_LIB[] = lib_name
 
-            # Try to load cached LLVM IR if available
-            cached_ir = get_cached_llvm_ir(cache_key)
-            if cached_ir !== nothing
-                try
-                    rust_mod = load_llvm_ir(cached_ir; source_code=wrapped_code)
-                    RUST_MODULE_REGISTRY[code_hash] = rust_mod
-                catch e
-                    @debug "Failed to load cached LLVM IR: $e"
-                end
-            end
+            # Temporarily disabled LLVM IR loading from cache
+            # cached_ir = get_cached_llvm_ir(cache_key)
+            # if cached_ir !== nothing
+            #     try
+            #         rust_mod = load_llvm_ir(cached_ir; source_code=wrapped_code)
+            #         RUST_MODULE_REGISTRY[code_hash] = rust_mod
+            #     catch e
+            #         @debug "Failed to load cached LLVM IR: $e"
+            #     end
+            # end
         end
 
         # Try to detect and register generic functions from the cached code
@@ -245,7 +294,7 @@ function _compile_and_load_rust(code::String, source_file::String, source_line::
     end
 
     # Load the library
-    lib_handle = Libdl.dlopen(lib_path, Libdl.RTLD_GLOBAL | Libdl.RTLD_NOW)
+    lib_handle = Libdl.dlopen(lib_path, Libdl.RTLD_LOCAL | Libdl.RTLD_NOW)
     if lib_handle == C_NULL
         error("Failed to load compiled Rust library: $lib_path")
     end

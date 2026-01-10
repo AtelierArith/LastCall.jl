@@ -201,8 +201,8 @@ result2 = @rust calc_mul(Int32(3), Int32(4))::Int32
 println("add result = $result1, mul result = $result2")
 ```
 
-!!! note
-    Each `rust""` block registers functions globally. Use unique function names to avoid conflicts.
+!!! note "Function Name Uniqueness"
+    Use unique function names across all `rust""` blocks. If the same function name exists in multiple libraries, an ambiguity error will be raised.
 
 ### Q: Can I use Rust generics?
 
