@@ -533,8 +533,10 @@ function generate_struct_wrappers(info::RustStructInfo)
         println(io, "#[no_mangle]")
 
         # Build arguments list for the wrapper
+        # Handle String types specially - they need FFI-safe conversion
         wrapper_args = String[]
         call_args = String[]
+        string_conversions = String[]  # Code to convert FFI strings to Rust String
 
         if !m.is_static
             push!(wrapper_args, "ptr: " * (m.is_mutable ? "*mut " : "*const ") * struct_name)
@@ -542,31 +544,61 @@ function generate_struct_wrappers(info::RustStructInfo)
         end
 
         for (aname, atype) in zip(m.arg_names, m.arg_types)
-            push!(wrapper_args, "$aname: $atype")
-            push!(call_args, aname)
+            if atype == "String"
+                # String is not FFI-safe, use *const u8 + length
+                push!(wrapper_args, "$(aname)_ptr: *const u8")
+                push!(wrapper_args, "$(aname)_len: usize")
+                # Add conversion code
+                push!(string_conversions, """    let $(aname) = unsafe {
+        let slice = std::slice::from_raw_parts($(aname)_ptr, $(aname)_len);
+        String::from_utf8_lossy(slice).into_owned()
+    };""")
+                push!(call_args, aname)
+            elseif atype == "&str"
+                # &str is also not FFI-safe
+                push!(wrapper_args, "$(aname)_ptr: *const u8")
+                push!(wrapper_args, "$(aname)_len: usize")
+                push!(string_conversions, """    let $(aname)_bytes = unsafe { std::slice::from_raw_parts($(aname)_ptr, $(aname)_len) };
+    let $(aname) = unsafe { std::str::from_utf8_unchecked($(aname)_bytes) };""")
+                push!(call_args, aname)
+            else
+                push!(wrapper_args, "$aname: $atype")
+                push!(call_args, aname)
+            end
         end
 
         args_str = join(wrapper_args, ", ")
+        conversions_str = join(string_conversions, "\n")
 
         returns_self = m.return_type == "Self" || m.return_type == struct_name
 
         if returns_self
             println(io, "pub extern \"C\" fn $wrapper_name($args_str) -> *mut $struct_name {")
+            # Add string conversions if any
+            if !isempty(string_conversions)
+                println(io, conversions_str)
+            end
             if m.is_static
-                println(io, "    let obj = $struct_name::$(m.name)($(join(m.arg_names, ", ")));")
+                # For static methods, call_args contains only the method arguments (no self)
+                println(io, "    let obj = $struct_name::$(m.name)($(join(call_args, ", ")));")
             else
+                # For instance methods, call_args[1] is self, so skip it
                 println(io, "    let self_obj = unsafe { &$(m.is_mutable ? "mut " : "") *ptr };")
-                println(io, "    let obj = self_obj.$(m.name)($(join(m.arg_names, ", ")));")
+                println(io, "    let obj = self_obj.$(m.name)($(join(call_args[2:end], ", ")));")
             end
             println(io, "    Box::into_raw(Box::new(obj))")
         else
             ret_decl = m.return_type == "()" ? "" : " -> $(m.return_type)"
             println(io, "pub extern \"C\" fn $wrapper_name($args_str)$ret_decl {")
+            # Add string conversions if any
+            if !isempty(string_conversions)
+                println(io, conversions_str)
+            end
             if m.is_static
-                println(io, "    $struct_name::$(m.name)($(join(m.arg_names, ", ")))")
+                println(io, "    $struct_name::$(m.name)($(join(call_args, ", ")))")
             else
                 println(io, "    let self_obj = unsafe { &$(m.is_mutable ? "mut " : "") *ptr };")
-                println(io, "    self_obj.$(m.name)($(join(m.arg_names, ", ")))")
+                println(io, "    self_obj.$(m.name)($(join(call_args[2:end], ", ")))")
             end
         end
         println(io, "}\n")
@@ -602,10 +634,8 @@ function emit_julia_definitions(info::RustStructInfo)
                 function $where_clause(ptr::Ptr{Cvoid}, lib::String) where {$(esc_T_params...)}
                     obj = new{$(esc_T_params...)}(ptr, lib)
                     finalizer(obj) do x
-                        # Call free (generic)
-                        # We use a special helper that resolves the generic free function
-                        # struct_func: Point_free
-                        _call_generic_free(x.lib_name, $(struct_name_str * "_free"), x.ptr, $(esc_T_params...))
+                        # Temporarily disabled free to diagnose segfault
+                        @debug "Finalizer: skipped free for generic struct $(struct_name_str) (ptr=$(x.ptr))"
                         x.ptr = C_NULL
                     end
                     return obj
@@ -727,7 +757,8 @@ function emit_julia_definitions(info::RustStructInfo)
                 obj = new(ptr, lib)
                 finalizer(obj) do x
                     if x.ptr != C_NULL
-                        _call_rust_free(x.lib_name, $(struct_name_str * "_free"), x.ptr)
+                        # Temporarily disabled free to diagnose segfault
+                        @debug "Finalizer: skipped free for struct $(struct_name_str) (ptr=$(x.ptr))"
                         x.ptr = C_NULL
                     end
                 end
@@ -746,12 +777,26 @@ function emit_julia_definitions(info::RustStructInfo)
         arg_names = [Symbol(an) for an in m.arg_names]
         esc_args = [esc(a) for a in arg_names]
 
+        # Build expanded arguments for String types
+        # String args need to be passed as (pointer, length) pairs
+        expanded_call_args = Expr[]
+        for (aname, atype) in zip(arg_names, m.arg_types)
+            esc_aname = esc(aname)
+            if atype == "String" || atype == "&str"
+                # Convert to (pointer, length) pair
+                push!(expanded_call_args, :(pointer($esc_aname)))
+                push!(expanded_call_args, :(sizeof($esc_aname)))
+            else
+                push!(expanded_call_args, esc_aname)
+            end
+        end
+
         if m.is_static
             if is_ctor
                 push!(exprs, quote
                     function (::Type{$esc_struct})($(esc_args...))
                         lib = get_current_library()
-                        ptr = _call_rust_constructor(lib, $wrapper_name, $(esc_args...))
+                        ptr = _call_rust_constructor(lib, $wrapper_name, $(expanded_call_args...))
                         return $esc_struct(ptr, lib)
                     end
                 end)
@@ -760,7 +805,7 @@ function emit_julia_definitions(info::RustStructInfo)
                 push!(exprs, quote
                     function $fname($(esc_args...))
                         lib = get_current_library()
-                        return _call_rust_method(lib, $wrapper_name, C_NULL, $(esc_args...), $(QuoteNode(jl_ret_type)))
+                        return _call_rust_method(lib, $wrapper_name, C_NULL, $(expanded_call_args...), $(QuoteNode(jl_ret_type)))
                     end
                 end)
             end
@@ -769,7 +814,7 @@ function emit_julia_definitions(info::RustStructInfo)
         is_ctor_ret = m.return_type == "Self" || m.return_type == struct_name_str
         push!(exprs, quote
             function $fname(self::$esc_struct, $(esc_args...))
-                res = _call_rust_method(self.lib_name, $wrapper_name, self.ptr, $(esc_args...), $(QuoteNode(jl_ret_type)))
+                res = _call_rust_method(self.lib_name, $wrapper_name, self.ptr, $(expanded_call_args...), $(QuoteNode(jl_ret_type)))
                 if $is_ctor_ret
                     return $esc_struct(res, self.lib_name)
                 else
