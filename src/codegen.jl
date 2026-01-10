@@ -20,6 +20,12 @@ Maps function name to FunctionInfo.
 const FUNCTION_REGISTRY = Dict{String, FunctionInfo}()
 
 """
+Registry for function return types (for functions without full signature registration).
+Maps function name to return type.
+"""
+const FUNCTION_RETURN_TYPES = Dict{String, Type}()
+
+"""
     register_function(name::String, lib_name::String, ret_type::Type, arg_types::Vector{Type})
 
 Register a function with its type signature for later calling.
