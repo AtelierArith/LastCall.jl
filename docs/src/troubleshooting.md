@@ -184,25 +184,21 @@ signal (11): Segmentation fault
 
 ### Q: Can I use multiple Rust libraries simultaneously?
 
-A: Yes! Each `rust""` block is compiled as an independent library, and `@rust` automatically searches all loaded libraries:
+A: Yes. You can define multiple functions in a single `rust""` block or use multiple blocks:
 
 ```@example troubleshooting
-# First library
+# Multiple functions in one block
 rust"""
 #[no_mangle]
-pub extern "C" fn lib1_add(a: i32, b: i32) -> i32 { a + b }
-"""
+pub extern "C" fn calc_add(a: i32, b: i32) -> i32 { a + b }
 
-# Second library
-rust"""
 #[no_mangle]
-pub extern "C" fn lib2_mul(a: i32, b: i32) -> i32 { a * b }
+pub extern "C" fn calc_mul(a: i32, b: i32) -> i32 { a * b }
 """
 
-# Both functions are accessible!
-result1 = @rust lib1_add(Int32(10), Int32(20))::Int32
-result2 = @rust lib2_mul(Int32(3), Int32(4))::Int32
-println("lib1_add(10, 20) = $result1, lib2_mul(3, 4) = $result2")
+result1 = @rust calc_add(Int32(10), Int32(20))::Int32
+result2 = @rust calc_mul(Int32(3), Int32(4))::Int32
+println("add result = $result1, mul result = $result2")
 ```
 
 !!! note "Function Name Uniqueness"
