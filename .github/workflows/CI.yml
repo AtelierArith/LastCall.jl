@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - 'lts'
+          # - 'lts' Dropped 1.10 support
           - '1'
         os:
           - ubuntu-latest
