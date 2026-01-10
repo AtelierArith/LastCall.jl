@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/atelierarith/LastCall.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/atelierarith/LastCall.jl/actions/workflows/CI.yml)
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/AtelierArith/LastCall.jl)
+
 **LastCall.jl** is a Foreign Function Interface (FFI) package for calling Rust code directly from Julia, inspired by [Cxx.jl](https://github.com/JuliaInterop/Cxx.jl).
 
 > It's the last call for headache. 🦀
