@@ -106,8 +106,20 @@ end
     _resolve_lib(mod::Module, lib_name::String)
 
 Resolve the actual library name to use, handling session-aware reloading for precompiled modules.
+
+When a module has multiple `rust\"\"\"` blocks, all libraries are loaded to enable
+the fallback function lookup across libraries in `get_function_pointer`.
 """
 function _resolve_lib(mod::Module, lib_name::String)
+    # Ensure ALL libraries from this module are loaded first
+    # This is needed because get_function_pointer does fallback search across all libraries
+    if isdefined(mod, :__LASTCALL_LIBS)
+        libs = getfield(mod, :__LASTCALL_LIBS)
+        for (lname, code) in libs
+            ensure_loaded(lname, code)
+        end
+    end
+
     # If no library name specified (e.g. @rust func() without a prior rust"""..."""),
     # try to use the module's active library.
     if isempty(lib_name)
@@ -115,14 +127,6 @@ function _resolve_lib(mod::Module, lib_name::String)
             lib_name = getfield(mod, :__LASTCALL_ACTIVE_LIB)[]
         else
             return get_current_library()
-        end
-    end
-
-    # Ensure the library is loaded in this session if we have the code
-    if isdefined(mod, :__LASTCALL_LIBS)
-        libs = getfield(mod, :__LASTCALL_LIBS)
-        if haskey(libs, lib_name)
-            ensure_loaded(lib_name, libs[lib_name])
         end
     end
 
