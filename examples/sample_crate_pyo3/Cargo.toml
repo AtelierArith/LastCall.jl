@@ -1,0 +1,16 @@
+[package]
+name = "sample_crate_pyo3"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+lastcall_macros = { path = "../../deps/lastcall_macros" }
+pyo3 = { version = "0.23", features = ["extension-module"], optional = true }
+
+[features]
+default = []
+# Enable Python bindings - forwards feature to lastcall_macros
+python = ["pyo3", "lastcall_macros/python"]
