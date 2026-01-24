@@ -21,6 +21,7 @@ Before running the examples, ensure you have:
 |---------|-------------|------------|--------------|
 | [MyExample.jl](./MyExample.jl/) | Julia package using `rust""` string literal | Beginner | Inline Rust code, basic FFI |
 | [sample_crate](./sample_crate/) | Rust crate using `#[julia]` attribute | Intermediate | External crate, `@rust_crate` macro |
+| [sample_crate_pyo3](./sample_crate_pyo3/) | Dual bindings for Julia and Python | Advanced | PyO3 integration, feature flags |
 
 ## Quick Start Guide
 
@@ -110,6 +111,43 @@ p.y  # => 4.0
 SampleCrate.distance_from_origin(p)  # => 5.0
 ```
 
+### sample_crate_pyo3
+
+A Rust crate demonstrating **dual bindings** for both Julia and Python using feature flags.
+
+**Features demonstrated:**
+- Coexistence of `#[julia]` and PyO3 in a single crate
+- Feature flags to separate Julia/Python builds
+- Shared core logic between both languages
+- Proper separation of concerns
+
+**How to build for Julia:**
+```bash
+cd examples/sample_crate_pyo3
+cargo build --release
+```
+
+**How to build for Python:**
+```bash
+cd examples/sample_crate_pyo3
+pip install maturin
+maturin build --features python
+```
+
+**How to use from Julia:**
+```julia
+using LastCall
+@rust_crate "/path/to/examples/sample_crate_pyo3"
+
+SampleCratePyo3.add(Int32(2), Int32(3))  # => 5
+```
+
+**How to use from Python:**
+```python
+import sample_crate_pyo3 as m
+m.py_add(2, 3)  # => 5
+```
+
 ## Learning Progression
 
 We recommend learning LastCall.jl in this order:
@@ -125,7 +163,12 @@ We recommend learning LastCall.jl in this order:
    - Explore struct handling and property access
    - Learn about `Result<T, E>` and `Option<T>` support
 
-3. **Read the documentation**
+3. **Explore sample_crate_pyo3** (optional)
+   - Learn how to create dual Julia/Python bindings
+   - Understand feature flags for conditional compilation
+   - See how to share core logic between languages
+
+4. **Read the documentation**
    - [Tutorial](../docs/src/tutorial.md)
    - [Crate Bindings (Phase 6)](../docs/src/crate_bindings.md)
    - [Troubleshooting](../docs/src/troubleshooting.md)
