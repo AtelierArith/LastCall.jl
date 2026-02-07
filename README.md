@@ -64,16 +64,31 @@ For full functionality including ownership types (Box, Rc, Arc), you need to bui
 
 ```julia
 using Pkg
-Pkg.build()
+Pkg.build("RustCall")
 ```
 
 Or from the command line:
 
 ```bash
-julia --project -e 'using Pkg; Pkg.build()'
+julia --project -e 'using Pkg; Pkg.build("RustCall")'
 ```
 
 This will compile the Rust helpers library that provides FFI functions for ownership types.
+
+## Project Structure
+
+- `src/`: RustCall implementation (`src/RustCall.jl` is the entry point)
+- `test/`: package tests (`test/runtests.jl` includes feature tests)
+- `docs/`: Documenter project and design notes
+- `deps/`: Rust helper/runtime and proc-macro crates used by build/runtime flows
+- `examples/`: runnable integration examples
+
+## Included Examples
+
+- `examples/MyExample.jl`: Julia package using inline `rust"""..."""` blocks
+- `examples/sample_crate`: external Rust crate using `#[julia]` and `@rust_crate`
+- `examples/sample_crate_pyo3`: dual Julia/Python bindings example
+- `examples/pluto/hello.jl`: Pluto notebook-style walkthrough
 
 ## Quick Start
 

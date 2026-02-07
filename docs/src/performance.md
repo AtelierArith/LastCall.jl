@@ -58,22 +58,27 @@ using RustCall
 
 # Create optimization configuration
 config = OptimizationConfig(
-    optimization_level=3,  # 0-3 (3 is most optimized)
+    level=3,  # 0-3 (3 is most optimized)
     enable_vectorization=true,
     enable_loop_unrolling=true,
     enable_licm=true
 )
 
-# Optimize module
-rust"""
+rust_code = """
 #[no_mangle]
 pub extern "C" fn compute(x: f64) -> f64 {
     x * x + 1.0
 }
 """
 
+# Compile Rust to LLVM IR and load module
+wrapped = RustCall.wrap_rust_code(rust_code)
+compiler = RustCall.get_default_compiler()
+ir_path = RustCall.compile_rust_to_llvm_ir(wrapped; compiler=compiler)
+rust_mod = RustCall.load_llvm_ir(ir_path; source_code=wrapped)
+mod = rust_mod.mod
+
 # Apply optimization
-mod = get_rust_module(rust_code)
 optimize_module!(mod; config=config)
 ```
 
@@ -85,9 +90,6 @@ optimize_for_speed!(mod)
 
 # Size-optimized
 optimize_for_size!(mod)
-
-# Balanced optimization
-optimize_balanced!(mod)
 ```
 
 ### Optimization Level Selection
@@ -106,10 +108,10 @@ optimize_balanced!(mod)
 
 ```julia
 # Standard call (recommended)
-result = @rust add(10i32, 20i32)
+result = @rust add(Int32(10), Int32(20))::Int32
 
 # LLVM integration call (experimental)
-result = @rust_llvm add(10i32, 20i32)
+result = @rust_llvm add(Int32(10), Int32(20))
 ```
 
 ### Type Inference Optimization
@@ -121,7 +123,7 @@ Explicit type specification can reduce type inference overhead:
 result = @rust add(10, 20)
 
 # Explicit type specification (recommended)
-result = @rust add(10i32, 20i32)::Int32
+result = @rust add(Int32(10), Int32(20))::Int32
 ```
 
 ### Function Registration Optimization
@@ -129,11 +131,16 @@ result = @rust add(10i32, 20i32)::Int32
 Frequently called functions can be optimized by registering them beforehand:
 
 ```julia
-# Register function
-register_function("add", "mylib", Int32, [Int32, Int32])
+# Register function for LLVM path
+compile_and_register_rust_function("""
+#[no_mangle]
+pub extern "C" fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+""", "add")
 
-# Call registered function (type checking is skipped)
-result = @rust add(10i32, 20i32)
+# Call through LLVM path
+result = @rust_llvm add(Int32(10), Int32(20))
 ```
 
 ## Memory Management

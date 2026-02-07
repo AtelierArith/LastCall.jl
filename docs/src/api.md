@@ -147,14 +147,15 @@ optimize_for_speed!
 optimize_for_size!
 ```
 
-## Function Registration (Phase 2)
+## LLVM Function Registration
 
 ```@docs
 RustFunctionInfo
 compile_and_register_rust_function
+julia_type_to_llvm_ir_string
 ```
 
-## Generics Support (Phase 2)
+## Generics Support
 
 ```@docs
 register_generic_function
@@ -165,7 +166,22 @@ specialize_generic_code
 infer_type_parameters
 ```
 
-## External Library Integration (Phase 3)
+## Generic Constraints
+
+```@docs
+TraitBound
+TypeConstraints
+GenericFunctionInfo
+parse_trait_bounds
+parse_single_trait
+parse_where_clause
+parse_inline_constraints
+parse_generic_function
+constraints_to_rust_string
+merge_constraints
+```
+
+## External Library Integration
 
 ### Dependency Management
 
@@ -183,6 +199,31 @@ create_cargo_project
 build_cargo_project
 clear_cargo_cache
 get_cargo_cache_size
+```
+
+## Crate Bindings
+
+```@docs
+CrateInfo
+CrateBindingOptions
+scan_crate
+generate_bindings
+write_bindings_to_file
+@rust_crate
+```
+
+## Hot Reload
+
+```@docs
+HotReloadState
+enable_hot_reload
+disable_hot_reload
+disable_all_hot_reload
+is_hot_reload_enabled
+list_hot_reload_crates
+trigger_reload
+set_hot_reload_global
+enable_hot_reload_for_crate
 ```
 
 ## Type System
@@ -304,8 +345,20 @@ Filter = t -> begin
         :parse_dependencies_from_code, :has_dependencies,
         :create_cargo_project, :build_cargo_project,
         :clear_cargo_cache, :get_cargo_cache_size,
+        :julia_type_to_llvm_ir_string,
+        :TraitBound, :TypeConstraints, :GenericFunctionInfo,
+        :parse_trait_bounds, :parse_single_trait, :parse_where_clause,
+        :parse_inline_constraints, :parse_generic_function,
+        :constraints_to_rust_string, :merge_constraints,
+        :CrateInfo, :CrateBindingOptions,
+        :scan_crate, :generate_bindings, :write_bindings_to_file,
+        :HotReloadState,
+        :enable_hot_reload, :disable_hot_reload, :disable_all_hot_reload,
+        :is_hot_reload_enabled, :list_hot_reload_crates,
+        :trigger_reload, :set_hot_reload_global, :enable_hot_reload_for_crate,
         # Macros (documented separately)
-        Symbol("@rust"), Symbol("@rust_str"), Symbol("@irust"), Symbol("@irust_str"), Symbol("@rust_llvm"),
+        Symbol("@rust"), Symbol("@rust_str"), Symbol("@irust"), Symbol("@irust_str"),
+        Symbol("@rust_llvm"), Symbol("@rust_crate"),
     ]
     # Get the binding name
     name = try

@@ -26,7 +26,7 @@ Pkg.add("RustCall")
 
 ### Requirements
 
-- Julia 1.10 or later
+- Julia 1.12 or later
 - Rust toolchain (`rustc` and `cargo`) installed and available in PATH
 
 To install Rust, visit [rustup.rs](https://rustup.rs/).
