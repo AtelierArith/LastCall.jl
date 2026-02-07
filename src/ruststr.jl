@@ -432,6 +432,13 @@ function _compile_and_load_rust_with_cargo(code::String, source_file::String, so
             @debug "Failed to register generic functions from memory cache: $e"
         end
 
+        # Register function signatures from memory cache
+        try
+            _register_function_signatures(code, lib_name)
+        catch e
+            @debug "Failed to register function signatures from memory cache: $e"
+        end
+
         return lib_name
     end
 
@@ -455,6 +462,13 @@ function _compile_and_load_rust_with_cargo(code::String, source_file::String, so
                 _detect_and_register_generic_functions(clean_code, lib_name)
             catch e
                 @debug "Failed to register generic functions from disk cache: $e"
+            end
+
+            # Register function signatures from disk cache
+            try
+                _register_function_signatures(code, lib_name)
+            catch e
+                @debug "Failed to register function signatures from disk cache: $e"
             end
 
             return lib_name
@@ -500,6 +514,13 @@ function _compile_and_load_rust_with_cargo(code::String, source_file::String, so
         catch e
             @debug "Failed to detect generic functions: $e"
         end
+
+        # Register non-generic function signatures
+        try
+            _register_function_signatures(code, lib_name)
+        catch e
+            @debug "Failed to register function signatures: $e"
+        end
     finally
         # Clean up temporary project (keep for debugging if debug mode is enabled)
         compiler = get_default_compiler()
@@ -525,7 +546,7 @@ Extract the full code for a function from Rust source code.
 """
 function extract_function_code(code::String, func_name::String)
     # Find function start - improved to handle nested brackets
-    func_start_pattern = Regex("fn\\\\s+\$func_name.*?\\\\{", "s")
+    func_start_pattern = Regex("fn\\s+$func_name.*?\\{", "s")
     m = match(func_start_pattern, code)
 
     if m === nothing
