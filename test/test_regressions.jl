@@ -251,6 +251,32 @@ using Test
         @test get(infos[1].derive_options, "Clone", false)
     end
 
+    @testset "extract_function_code handles multiple escaped quotes (#124)" begin
+        # Multiple escaped quotes in a row should not break parsing
+        code = """
+        fn multi_escape() {
+            let s = "a\\"b\\"c\\"d";
+            let x = 99;
+        }
+        """
+        extracted = RustCall.extract_function_code(code, "multi_escape")
+        @test extracted !== nothing
+        @test occursin("let x = 99", extracted)
+    end
+
+    @testset "extract_function_code handles adjacent string literals (#124)" begin
+        code = """
+        fn adjacent_strings() {
+            let a = "{ open";
+            let b = "} close";
+            let result = 42;
+        }
+        """
+        extracted = RustCall.extract_function_code(code, "adjacent_strings")
+        @test extracted !== nothing
+        @test occursin("let result = 42", extracted)
+    end
+
     @testset "extract_function_code returns nothing for nonexistent function" begin
         code = """
         fn real_function() {
