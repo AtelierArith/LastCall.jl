@@ -8,13 +8,15 @@ Exception type for Rust-related errors.
 # Fields
 - `message::String`: Error message
 - `code::Int32`: Optional error code (default: 0)
+- `original_error::Any`: Original typed error value from Rust (default: nothing)
 """
 struct RustError <: Exception
     message::String
     code::Int32
+    original_error::Any
 
-    function RustError(message::String, code::Int32=Int32(0))
-        new(message, code)
+    function RustError(message::String, code::Int32=Int32(0), original_error=nothing)
+        new(message, code, original_error)
     end
 end
 
@@ -124,6 +126,9 @@ function Base.showerror(io::IO, e::RustError)
         print(io, "RustError: $(e.message)")
     else
         print(io, "RustError: $(e.message) (code: $(e.code))")
+    end
+    if e.original_error !== nothing
+        print(io, " [original: $(repr(e.original_error))]")
     end
 end
 
@@ -627,7 +632,11 @@ function result_to_exception(result::RustResult{T, E}) where {T, E}
     else
         error_value = result.value::E
         error_msg = string(error_value)
-        throw(RustError(error_msg, Int32(0)))
+        if error_value isa Integer
+            throw(RustError(error_msg, Int32(error_value), error_value))
+        else
+            throw(RustError(error_msg, Int32(-1), error_value))
+        end
     end
 end
 
@@ -652,7 +661,7 @@ function result_to_exception(result::RustResult{T, E}, code::Int32) where {T, E}
     else
         error_value = result.value::E
         error_msg = string(error_value)
-        throw(RustError(error_msg, code))
+        throw(RustError(error_msg, code, error_value))
     end
 end
 

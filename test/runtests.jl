@@ -110,16 +110,23 @@ include("test_regressions.jl")
         err1 = RustError("test error")
         @test err1.message == "test error"
         @test err1.code == 0
+        @test err1.original_error === nothing
 
         err2 = RustError("test error", Int32(42))
         @test err2.message == "test error"
         @test err2.code == 42
+        @test err2.original_error === nothing
+
+        err3 = RustError("test error", Int32(42), "original")
+        @test err3.message == "test error"
+        @test err3.code == 42
+        @test err3.original_error == "original"
 
         # Test result_to_exception with Ok result
         ok_result = RustResult{Int32, String}(true, Int32(42))
         @test result_to_exception(ok_result) == 42
 
-        # Test result_to_exception with Err result
+        # Test result_to_exception with Err result (String error → code -1, preserves original)
         err_result = RustResult{Int32, String}(false, "division by zero")
         @test_throws RustError result_to_exception(err_result)
         try
@@ -127,10 +134,23 @@ include("test_regressions.jl")
         catch e
             @test e isa RustError
             @test e.message == "division by zero"
-            @test e.code == 0
+            @test e.code == -1
+            @test e.original_error == "division by zero"
         end
 
-        # Test result_to_exception with error code
+        # Test result_to_exception with Integer error type (uses error value as code)
+        int_err_result = RustResult{String, Int32}(false, Int32(42))
+        @test_throws RustError result_to_exception(int_err_result)
+        try
+            result_to_exception(int_err_result)
+        catch e
+            @test e isa RustError
+            @test e.message == "42"
+            @test e.code == 42
+            @test e.original_error == Int32(42)
+        end
+
+        # Test result_to_exception with explicit error code (preserves original)
         err_result2 = RustResult{Int32, String}(false, "not found")
         @test_throws RustError result_to_exception(err_result2, Int32(404))
         try
@@ -139,6 +159,7 @@ include("test_regressions.jl")
             @test e isa RustError
             @test e.message == "not found"
             @test e.code == 404
+            @test e.original_error == "not found"
         end
 
         # Test unwrap_or_throw alias
