@@ -232,14 +232,36 @@ function load_cache_metadata(cache_key::String)
         return nothing
     end
 
-    # Simple JSON parsing (for now, we'll use a basic approach)
-    # In production, consider using JSON.jl
     try
         content = read(metadata_path, String)
-        # Simple parsing - extract key fields
-        # For now, return a basic structure
-        # Full JSON parsing can be added later if needed
-        return nothing  # Placeholder - implement full parsing if needed
+
+        # Parse simple JSON fields written by save_cache_metadata.
+        # The format is a flat object with string values and one string-array value.
+        function _extract_string_field(text, key)
+            m = match(Regex("\"$(key)\"\\s*:\\s*\"([^\"]*)\""), text)
+            return m === nothing ? "" : String(m.captures[1])
+        end
+
+        ck = _extract_string_field(content, "cache_key")
+        ch = _extract_string_field(content, "code_hash")
+        cc = _extract_string_field(content, "compiler_config")
+        tt = _extract_string_field(content, "target_triple")
+        ca_str = _extract_string_field(content, "created_at")
+
+        # Parse the functions array: "functions": ["f1", "f2"]
+        funcs = String[]
+        m_funcs = match(r"\"functions\"\s*:\s*\[([^\]]*)\]", content)
+        if m_funcs !== nothing
+            arr_content = m_funcs.captures[1]
+            for m_item in eachmatch(r"\"([^\"]+)\"", arr_content)
+                push!(funcs, String(m_item.captures[1]))
+            end
+        end
+
+        # Parse created_at datetime
+        created_at = isempty(ca_str) ? Dates.now() : DateTime(ca_str)
+
+        return CacheMetadata(ck, ch, cc, tt, created_at, funcs)
     catch e
         @warn "Failed to load cache metadata: $e"
         return nothing

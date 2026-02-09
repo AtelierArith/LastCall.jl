@@ -57,6 +57,54 @@ using Test
         @test isa(cached_libs, Vector{String})
     end
 
+    @testset "Cache Metadata Round-trip (issue #90)" begin
+        using Dates
+
+        test_key = "test_metadata_roundtrip_key_0123456789abcdef"
+        test_metadata = RustCall.CacheMetadata(
+            test_key,
+            "abcdef1234567890abcdef1234567890",
+            "2_false_x86_64-unknown-linux-gnu",
+            "x86_64-unknown-linux-gnu",
+            DateTime(2025, 6, 15, 12, 30, 0),
+            ["add", "multiply", "divide"]
+        )
+
+        # Save metadata
+        RustCall.save_cache_metadata(test_key, test_metadata)
+
+        # Load it back
+        loaded = RustCall.load_cache_metadata(test_key)
+        @test loaded !== nothing
+        @test loaded.cache_key == test_key
+        @test loaded.code_hash == "abcdef1234567890abcdef1234567890"
+        @test loaded.compiler_config == "2_false_x86_64-unknown-linux-gnu"
+        @test loaded.target_triple == "x86_64-unknown-linux-gnu"
+        @test loaded.created_at == DateTime(2025, 6, 15, 12, 30, 0)
+        @test loaded.functions == ["add", "multiply", "divide"]
+
+        # Non-existent key returns nothing
+        @test RustCall.load_cache_metadata("nonexistent_key_xyz") === nothing
+
+        # Empty functions list round-trips
+        test_key2 = "test_metadata_empty_funcs"
+        test_metadata2 = RustCall.CacheMetadata(
+            test_key2, "hash2", "config2", "triple2",
+            DateTime(2025, 1, 1), String[]
+        )
+        RustCall.save_cache_metadata(test_key2, test_metadata2)
+        loaded2 = RustCall.load_cache_metadata(test_key2)
+        @test loaded2 !== nothing
+        @test loaded2.functions == String[]
+
+        # Clean up test metadata files
+        metadata_dir = RustCall.get_metadata_dir()
+        for k in [test_key, test_key2]
+            p = joinpath(metadata_dir, "$(k).json")
+            isfile(p) && rm(p)
+        end
+    end
+
     # Only run rustc tests if rustc is available
     if RustCall.check_rustc_available()
         @testset "Cache Hit/Miss" begin
