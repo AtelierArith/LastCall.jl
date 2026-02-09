@@ -59,6 +59,21 @@ function RustCompiler(;
 end
 
 """
+    _unique_source_name(code::String, compiler::RustCompiler) -> String
+
+Generate a unique base filename for a compilation unit. When `debug_dir` is set,
+uses a hash of the code to avoid overwriting files from different compilations.
+Otherwise returns a fixed name since each compilation uses its own temp directory.
+"""
+function _unique_source_name(code::String, compiler::RustCompiler)
+    if compiler.debug_mode && compiler.debug_dir !== nothing
+        fingerprint = bytes2hex(sha256(code))[1:RECOVERY_FINGERPRINT_LEN]
+        return "rust_$(fingerprint)"
+    end
+    return "rust_code"
+end
+
+"""
     get_default_target() -> String
 
 Get the default target triple for the current platform.
@@ -173,8 +188,10 @@ function compile_rust_to_llvm_ir(code::String; compiler::RustCompiler = get_defa
         tmp_dir = mktempdir()
     end
 
-    rs_file = joinpath(tmp_dir, "rust_code.rs")
-    ll_file = joinpath(tmp_dir, "rust_code.ll")
+    # Use unique filenames in debug_dir to avoid overwriting across compilations
+    base_name = _unique_source_name(code, compiler)
+    rs_file = joinpath(tmp_dir, "$(base_name).rs")
+    ll_file = joinpath(tmp_dir, "$(base_name).ll")
 
     # Write the Rust code to the temporary file
     write(rs_file, code)
@@ -327,9 +344,11 @@ function compile_rust_to_shared_lib(code::String; compiler::RustCompiler = get_d
         tmp_dir = mktempdir()
     end
 
-    rs_file = joinpath(tmp_dir, "rust_code.rs")
+    # Use unique filenames in debug_dir to avoid overwriting across compilations
+    base_name = _unique_source_name(code, compiler)
+    rs_file = joinpath(tmp_dir, "$(base_name).rs")
     lib_ext = get_library_extension()
-    lib_file = joinpath(tmp_dir, "librust_code$lib_ext")
+    lib_file = joinpath(tmp_dir, "lib$(base_name)$lib_ext")
 
     # Write the Rust code to the temporary file
     write(rs_file, code)

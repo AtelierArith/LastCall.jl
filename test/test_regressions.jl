@@ -142,7 +142,7 @@ using Test
 
     @testset "Qualified @rust calls resolve libraries consistently" begin
         qualified_call = Expr(:call, Expr(:(::), :fake_lib, :fake_fn), :(Int32(1)))
-        expanded = RustCall.rust_impl(@__MODULE__, qualified_call, LineNumberNode(1))
+        expanded = RustCall.rust_impl(@__MODULE__, qualified_call)
         expanded_str = sprint(show, expanded)
         @test occursin("_rust_call_from_lib", expanded_str)
         @test occursin("_resolve_lib", expanded_str)
@@ -356,5 +356,72 @@ using Test
         @test type_params == [:T, :U]
         @test haskey(constraints, :T)
         @test !haskey(constraints, Symbol("'a"))
+    end
+
+    @testset "_convert_args_for_rust dead code removed (#99)" begin
+        # _convert_args_for_rust was a no-op function that returned args unchanged.
+        # Verify it has been removed from the module.
+        @test !isdefined(RustCall, :_convert_args_for_rust)
+    end
+
+    @testset "Unused source parameter removed from macro expansion (#100)" begin
+        # rust_impl and friends no longer accept a source parameter.
+        # Verify 2-arg rust_impl works and 3-arg (with source) errors.
+        call_expr = Expr(:call, :fake_fn, :(Int32(1)))
+        expanded = RustCall.rust_impl(@__MODULE__, call_expr)
+        expanded_str = sprint(show, expanded)
+        @test occursin("_rust_call_dynamic", expanded_str)
+
+        # The old 3-arg signature should no longer exist
+        @test_throws MethodError RustCall.rust_impl(@__MODULE__, call_expr, LineNumberNode(1))
+    end
+
+    @testset "Unique filenames in debug_dir prevent overwrite (#101)" begin
+        # When debug_dir is set, different source code should produce different filenames
+        compiler_debug = RustCall.RustCompiler(debug_mode=true, debug_dir=mktempdir())
+
+        name1 = RustCall._unique_source_name("fn foo() {}", compiler_debug)
+        name2 = RustCall._unique_source_name("fn bar() {}", compiler_debug)
+        name_same = RustCall._unique_source_name("fn foo() {}", compiler_debug)
+
+        # Different code → different names
+        @test name1 != name2
+        # Same code → same name (deterministic)
+        @test name1 == name_same
+        # Names should have hash prefix
+        @test startswith(name1, "rust_")
+        @test length(name1) == 5 + RustCall.RECOVERY_FINGERPRINT_LEN  # "rust_" + 12-char hash
+
+        # Without debug_dir, should return the fixed name
+        compiler_normal = RustCall.RustCompiler(debug_mode=false)
+        @test RustCall._unique_source_name("fn foo() {}", compiler_normal) == "rust_code"
+
+        # Clean up
+        rm(compiler_debug.debug_dir, recursive=true, force=true)
+
+        # Integration test: compile two functions to the same debug_dir
+        if RustCall.check_rustc_available()
+            debug_dir = mktempdir()
+            compiler = RustCall.RustCompiler(debug_mode=true, debug_dir=debug_dir)
+
+            code1 = """
+            #[no_mangle]
+            pub extern "C" fn debug_fn_a() -> i32 { 1 }
+            """
+            code2 = """
+            #[no_mangle]
+            pub extern "C" fn debug_fn_b() -> i32 { 2 }
+            """
+
+            lib1 = RustCall.compile_rust_to_shared_lib(code1; compiler=compiler)
+            lib2 = RustCall.compile_rust_to_shared_lib(code2; compiler=compiler)
+
+            # Both libraries should exist (not overwritten)
+            @test isfile(lib1)
+            @test isfile(lib2)
+            @test lib1 != lib2
+
+            rm(debug_dir, recursive=true, force=true)
+        end
     end
 end

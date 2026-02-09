@@ -23,7 +23,7 @@ Call a Rust function from Julia.
 ```
 """
 macro rust(expr)
-    return rust_impl(__module__, expr, __source__)
+    return rust_impl(__module__, expr)
 end
 
 const RUST_COMPARISON_OPS = Set{Symbol}([
@@ -39,11 +39,11 @@ const RUST_COMPARISON_OPS = Set{Symbol}([
 ])
 
 """
-    rust_impl(mod, expr, source)
+    rust_impl(mod, expr)
 
 Implementation of the @rust macro.
 """
-function rust_impl(mod, expr, source)
+function rust_impl(mod, expr)
     if isexpr(expr, :call)
         op = expr.args[1]
         if op isa Symbol && op in RUST_COMPARISON_OPS
@@ -52,7 +52,7 @@ function rust_impl(mod, expr, source)
             end
             lhs = expr.args[2]
             rhs = expr.args[3]
-            rust_expr = rust_impl(mod, lhs, source)
+            rust_expr = rust_impl(mod, lhs)
             return Expr(:call, op, rust_expr, esc(rhs))
         end
     end
@@ -68,19 +68,19 @@ function rust_impl(mod, expr, source)
         qualified = _parse_qualified_call(lhs)
         if qualified !== nothing
             lib_name, call_expr = qualified
-            return rust_impl_qualified(mod, lib_name, call_expr, ret_type, source)
+            return rust_impl_qualified(mod, lib_name, call_expr, ret_type)
         end
 
         # Regular typed call
         if isexpr(lhs, :call)
-            return rust_impl_with_type(mod, lhs, ret_type, source)
+            return rust_impl_with_type(mod, lhs, ret_type)
         end
 
         # Qualified call without return type: @rust lib::func(args...)
         qualified = _parse_qualified_call(expr)
         if qualified !== nothing
             lib_name, call_expr = qualified
-            return rust_impl_qualified(mod, lib_name, call_expr, nothing, source)
+            return rust_impl_qualified(mod, lib_name, call_expr, nothing)
         end
 
         error("Expected function call before ::Type, got: $lhs")
@@ -90,23 +90,23 @@ function rust_impl(mod, expr, source)
     qualified = _parse_qualified_call(expr)
     if qualified !== nothing
         lib_name, call_expr = qualified
-        return rust_impl_qualified(mod, lib_name, call_expr, nothing, source)
+        return rust_impl_qualified(mod, lib_name, call_expr, nothing)
     end
 
     # Handle simple function call: @rust func(args...)
     if isexpr(expr, :call)
-        return rust_impl_call(mod, expr, nothing, source)
+        return rust_impl_call(mod, expr, nothing)
     end
 
     error("Invalid @rust syntax: $expr")
 end
 
 """
-    rust_impl_call(mod, expr, ret_type, source)
+    rust_impl_call(mod, expr, ret_type)
 
 Handle a simple function call.
 """
-function rust_impl_call(mod, expr, ret_type, source)
+function rust_impl_call(mod, expr, ret_type)
     func_name = expr.args[1]
     args = expr.args[2:end]
 
@@ -158,24 +158,24 @@ function _resolve_lib(mod::Module, lib_name::String)
 end
 
 """
-    rust_impl_with_type(mod, call_expr, ret_type, source)
+    rust_impl_with_type(mod, call_expr, ret_type)
 
 Handle a function call with explicit return type.
 """
-function rust_impl_with_type(mod, call_expr, ret_type, source)
+function rust_impl_with_type(mod, call_expr, ret_type)
     if !isexpr(call_expr, :call)
         error("Expected function call before ::Type, got: $call_expr")
     end
 
-    return rust_impl_call(mod, call_expr, ret_type, source)
+    return rust_impl_call(mod, call_expr, ret_type)
 end
 
 """
-    rust_impl_qualified(mod, lib_name, call_expr, ret_type, source)
+    rust_impl_qualified(mod, lib_name, call_expr, ret_type)
 
 Handle a library-qualified function call: lib::func(args...)
 """
-function rust_impl_qualified(mod, lib_name, call_expr, ret_type, source)
+function rust_impl_qualified(mod, lib_name, call_expr, ret_type)
     func_name = call_expr.args[1]
     args = call_expr.args[2:end]
     lib_name_str = string(lib_name)
@@ -229,16 +229,6 @@ function _parse_qualified_call(expr)
     return nothing
 end
 
-"""
-    _convert_args_for_rust(args...)
-
-Convert Julia arguments to Rust-compatible types.
-String arguments are passed directly and converted by ccall.
-"""
-function _convert_args_for_rust(args...)
-    # No conversion needed - ccall handles String -> Cstring
-    return args
-end
 
 """
     _rust_call_dynamic(lib_name::String, func_name::String, args...)
@@ -258,32 +248,29 @@ function _rust_call_dynamic(lib_name::String, func_name::String, args...)
     @debug "Calling function '$func_name' from library '$lib_name'"
     func_ptr = get_function_pointer(lib_name, func_name)
 
-    # Convert arguments (String -> Cstring)
-    converted_args = _convert_args_for_rust(args...)
-
     # Try to get type info from registered function info
     func_info = get_function_info(lib_name, func_name)
     if func_info !== nothing && func_info.return_type !== Any
-        return call_rust_function(func_ptr, func_info.return_type, converted_args...)
+        return call_rust_function(func_ptr, func_info.return_type, args...)
     end
 
     # Try to get return type from registries (library-scoped first, then fallback)
     ret_type = get_function_return_type(lib_name, func_name)
     if ret_type !== nothing
         @debug "Using registered return type for $func_name: $ret_type"
-        return call_rust_function(func_ptr, ret_type, converted_args...)
+        return call_rust_function(func_ptr, ret_type, args...)
     end
 
     # Try to get type info from LLVM analysis
     try
         ret_type, expected_arg_types = infer_function_types(lib_name, func_name)
-        return call_rust_function(func_ptr, ret_type, converted_args...)
+        return call_rust_function(func_ptr, ret_type, args...)
     catch
         # Fall back to inference from arguments
     end
 
     # Use inference from argument types
-    return call_rust_function_infer(func_ptr, converted_args...)
+    return call_rust_function_infer(func_ptr, args...)
 end
 
 """
@@ -306,9 +293,7 @@ function _rust_call_typed(lib_name::String, func_name::String, ret_type::Type, a
         end
     end
 
-    # Convert arguments (String -> Cstring)
-    converted_args = _convert_args_for_rust(args...)
-    return call_rust_function(func_ptr, ret_type, converted_args...)
+    return call_rust_function(func_ptr, ret_type, args...)
 end
 
 """
