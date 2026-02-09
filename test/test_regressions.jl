@@ -351,6 +351,38 @@ using Test
         empty!(RustCall.GENERIC_FUNCTION_REGISTRY)
     end
 
+    @testset "Concurrent registry access is safe (#112)" begin
+        # Verify that concurrent reads/writes to global registries
+        # don't crash (thread safety via REGISTRY_LOCK)
+        n_tasks = 4
+        n_ops = 10
+        errors = Threads.Atomic{Int}(0)
+
+        tasks = []
+        for t in 1:n_tasks
+            task = Threads.@spawn begin
+                for i in 1:n_ops
+                    try
+                        # Read from GENERIC_FUNCTION_REGISTRY (should be locked)
+                        RustCall.is_generic_function("concurrent_test_$(t)_$(i)")
+                        # Read from IRUST_FUNCTIONS (should be locked)
+                        lock(RustCall.REGISTRY_LOCK) do
+                            haskey(RustCall.IRUST_FUNCTIONS, UInt64(t * 1000 + i))
+                        end
+                    catch
+                        Threads.atomic_add!(errors, 1)
+                    end
+                end
+            end
+            push!(tasks, task)
+        end
+
+        for task in tasks
+            fetch(task)
+        end
+        @test errors[] == 0
+    end
+
     @testset "Deeply nested generics in specialize_generic_code (#108)" begin
         # Ensure bracket-counting handles arbitrary nesting depth
         code = "pub fn deep<T>(x: Vec<Option<Result<T, String>>>) -> T { todo!() }"
