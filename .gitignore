@@ -54,3 +54,5 @@ JuliaLocalPreferences.toml
 
 build
 *.log
+.worktree
+worktree
