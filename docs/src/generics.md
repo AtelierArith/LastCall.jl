@@ -49,11 +49,12 @@ pub extern "C" fn add<T>(a: T, b: T) -> T {
 }
 """
 
-register_generic_function("add", code, [:T])
+RustCall.register_generic_function("add", code, [:T])
 
 # Call with different types
-result = call_generic_function("add", Int32(10), Int32(20))  # => 30
+result = RustCall.call_generic_function("add", Int32(10), Int32(20))  # => 30
 ```
+
 
 ## How It Works
 
@@ -110,11 +111,12 @@ pub extern "C" fn identity<T>(x: T) -> T {
 """
 
 # Register generic function
-register_generic_function("identity", code, [:T])
+RustCall.register_generic_function("identity", code, [:T])
 
 # Explicitly monomorphize
 type_params = Dict(:T => Int32)
-info = monomorphize_function("identity", type_params)
+info = RustCall.monomorphize_function("identity", type_params)
+
 
 # Call using @rust macro (recommended way)
 # Note: After monomorphization, you can call it directly
@@ -145,9 +147,10 @@ pub fn identity<T: Copy + Clone>(x: T) -> T {
 """
 
 # Parse the generic function (constraints are automatically extracted)
-info = parse_generic_function(code, "identity")
-println(info.constraints)  # Dict(:T => TypeConstraints([Copy, Clone]))
+info = RustCall.parse_generic_function(code, "identity")
+println(info.constraints)  # Dict(:T => RustCall.TypeConstraints([Copy, Clone]))
 ```
+
 
 ### Manually Specifying Constraints
 
@@ -162,15 +165,15 @@ pub fn add<T>(a: T, b: T) -> T {
 }
 """
 
-# Using TypeConstraints (recommended)
-constraints = Dict(:T => TypeConstraints([
-    TraitBound("Copy", String[]),
-    TraitBound("Add", ["Output = T"])
+# Using RustCall.TypeConstraints (recommended)
+constraints = Dict(:T => RustCall.TypeConstraints([
+    RustCall.TraitBound("Copy", String[]),
+    RustCall.TraitBound("Add", ["Output = T"])
 ]))
-register_generic_function("add", code, [:T], constraints)
+RustCall.register_generic_function("add", code, [:T], constraints)
 
 # Or using the legacy string format (backward compatible)
-register_generic_function("add_legacy", code, [:T], Dict(:T => "Copy + Add<Output = T>"))
+RustCall.register_generic_function("add_legacy", code, [:T], Dict(:T => "Copy + Add<Output = T>"))
 ```
 
 ### Converting Constraints to Rust Syntax
@@ -180,11 +183,11 @@ You can convert parsed constraints back to Rust syntax:
 ```julia
 using RustCall
 
-constraints = Dict(:T => TypeConstraints([
-    TraitBound("Copy", String[]),
-    TraitBound("Clone", String[])
+constraints = Dict(:T => RustCall.TypeConstraints([
+    RustCall.TraitBound("Copy", String[]),
+    RustCall.TraitBound("Clone", String[])
 ]))
-rust_str = constraints_to_rust_string(constraints)
+rust_str = RustCall.constraints_to_rust_string(constraints)
 println(rust_str)  # "T: Copy + Clone"
 ```
 
@@ -281,10 +284,10 @@ pub extern "C" fn multiply<T>(a: T, b: T) -> T {
 }
 """
 
-register_generic_function("multiply", code, [:T])
+RustCall.register_generic_function("multiply", code, [:T])
 
 # Call with automatic monomorphization
-result = call_generic_function("multiply", Int32(5), Int32(6))  # => 30
+result = RustCall.call_generic_function("multiply", Int32(5), Int32(6))  # => 30
 println("Result: $result")
 ```
 

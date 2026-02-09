@@ -27,18 +27,18 @@ RustCall.jl automatically caches compiled Rust libraries. This eliminates the ne
 using RustCall
 
 # Check cache size
-size = get_cache_size()
+size = RustCall.get_cache_size()
 println("Cache size: $(size / 1024 / 1024) MB")
 
 # List cached libraries
-libraries = list_cached_libraries()
+libraries = RustCall.list_cached_libraries()
 println("Cached libraries: $(length(libraries))")
 
 # Cleanup old cache (older than 30 days)
-cleanup_old_cache(30)
+RustCall.cleanup_old_cache(30)
 
 # Clear cache completely
-clear_cache()
+RustCall.clear_cache()
 ```
 
 ### Cache Best Practices
@@ -57,7 +57,7 @@ RustCall.jl supports optimization at the LLVM IR level. Using the `@rust_llvm` m
 using RustCall
 
 # Create optimization configuration
-config = OptimizationConfig(
+config = RustCall.OptimizationConfig(
     level=3,  # 0-3 (3 is most optimized)
     enable_vectorization=true,
     enable_loop_unrolling=true,
@@ -79,17 +79,17 @@ rust_mod = RustCall.load_llvm_ir(ir_path; source_code=wrapped)
 mod = rust_mod.mod
 
 # Apply optimization
-optimize_module!(mod; config=config)
+RustCall.optimize_module!(mod; config=config)
 ```
 
 ### Optimization Presets
 
 ```julia
 # Speed-optimized
-optimize_for_speed!(mod)
+RustCall.optimize_for_speed!(mod)
 
 # Size-optimized
-optimize_for_size!(mod)
+RustCall.optimize_for_size!(mod)
 ```
 
 ### Optimization Level Selection
@@ -132,7 +132,7 @@ Frequently called functions can be optimized by registering them beforehand:
 
 ```julia
 # Register function for LLVM path
-compile_and_register_rust_function("""
+RustCall.compile_and_register_rust_function("""
 #[no_mangle]
 pub extern "C" fn add(a: i32, b: i32) -> i32 {
     a + b
@@ -151,11 +151,11 @@ Ownership types (`RustBox`, `RustRc`, `RustArc`, `RustVec`) prevent memory leaks
 
 ```julia
 # Temporary allocations are automatically cleaned up
-box = RustBox(Int32(42))
+box = RustCall.RustBox(Int32(42))
 # Automatically dropped after use
 
 # Explicit drop (when early release is needed)
-drop!(box)
+RustCall.drop!(box)
 ```
 
 ### Efficient Use of RustVec
@@ -165,14 +165,14 @@ drop!(box)
 ```julia
 # Create RustVec from Julia array
 julia_vec = Int32[1, 2, 3, 4, 5]
-rust_vec = create_rust_vec(julia_vec)
+rust_vec = RustCall.create_rust_vec(julia_vec)
 
 # Efficient bulk copy (recommended)
 result = Vector{Int32}(undef, length(rust_vec))
-copy_to_julia!(rust_vec, result)
+RustCall.copy_to_julia!(rust_vec, result)
 
 # Or use to_julia_vector
-result = to_julia_vector(rust_vec)
+result = RustCall.to_julia_vector(rust_vec)
 
 # Element-by-element access (not recommended for large data)
 for i in 1:length(rust_vec)
@@ -180,7 +180,7 @@ for i in 1:length(rust_vec)
 end
 
 # Explicitly drop after use
-drop!(rust_vec)
+RustCall.drop!(rust_vec)
 ```
 
 ### RustVec vs Julia Array Selection
@@ -197,17 +197,17 @@ drop!(rust_vec)
 
 ```julia
 # Pattern 1: Use try-finally
-box = RustBox(Int32(42))
+box = RustCall.RustBox(Int32(42))
 try
     # Use
     value = box.ptr
 finally
-    drop!(box)  # Ensure cleanup
+    RustCall.drop!(box)  # Ensure cleanup
 end
 
 # Pattern 2: Leverage local scope
 function compute()
-    box = RustBox(Int32(42))
+    box = RustCall.RustBox(Int32(42))
     # Use
     return result
     # box is automatically dropped
@@ -284,11 +284,11 @@ julia --project benchmark/benchmarks_generics.jl
 - **Disable debug info**: `emit_debug_info=false`
 
 ```julia
-compiler = RustCompiler(
+compiler = RustCall.RustCompiler(
     optimization_level=2,  # 2 is sufficient during development
     emit_debug_info=false
 )
-set_default_compiler(compiler)
+RustCall.set_default_compiler(compiler)
 ```
 
 ### 2. Improving Runtime Performance
@@ -321,13 +321,13 @@ end
 using Base.Threads
 
 # Use Arc to share data between threads
-shared_data = RustArc(Int32(0))
+shared_data = RustCall.RustArc(Int32(0))
 
 # Work on multiple threads
 @threads for i in 1:1000
-    local_arc = clone(shared_data)
+    local_arc = RustCall.clone(shared_data)
     # Work
-    drop!(local_arc)
+    RustCall.drop!(local_arc)
 end
 ```
 

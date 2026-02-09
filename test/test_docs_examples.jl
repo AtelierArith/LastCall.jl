@@ -100,17 +100,17 @@ using RustCall
         @test result == -1  # Error code
 
         # Explicit Use of RustResult
-        ok_result = RustResult{Int32, String}(true, Int32(42))
-        @test is_ok(ok_result) == true
-        @test unwrap(ok_result) == 42
+        ok_result = RustCall.RustResult{Int32, String}(true, Int32(42))
+        @test RustCall.is_ok(ok_result) == true
+        @test RustCall.unwrap(ok_result) == 42
 
-        err_result = RustResult{Int32, String}(false, "error message")
-        @test is_err(err_result) == true
-        @test unwrap_or(err_result, Int32(0)) == 0
+        err_result = RustCall.RustResult{Int32, String}(false, "error message")
+        @test RustCall.is_err(err_result) == true
+        @test RustCall.unwrap_or(err_result, Int32(0)) == 0
     end
 
     @testset "tutorial.md - Ownership Types" begin
-        if is_rust_helpers_available()
+        if RustCall.is_rust_helpers_available()
             # RustBox example (simplified - actual usage requires ptr from Rust)
             # This is tested more thoroughly in test_ownership.jl
 
@@ -128,11 +128,11 @@ using RustCall
 
     @testset "tutorial.md - Cache Management" begin
         # Check cache size
-        size = get_cache_size()
+        size = RustCall.get_cache_size()
         @test size >= 0
 
         # List cached libraries
-        libs = list_cached_libraries()
+        libs = RustCall.list_cached_libraries()
         @test libs isa Vector
 
         # Note: We don't actually cleanup or clear cache in tests

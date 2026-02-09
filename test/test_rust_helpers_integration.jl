@@ -34,8 +34,8 @@ end
     end
 
     @testset "Library Loading" begin
-        if is_rust_helpers_available()
-            lib = get_rust_helpers_lib()
+        if RustCall.is_rust_helpers_available()
+            lib = RustCall.get_rust_helpers_lib()
             @test lib !== nothing
             @test lib != C_NULL
 
@@ -84,60 +84,60 @@ end
     end
 
     @testset "End-to-End Integration" begin
-        if is_rust_helpers_available()
+        if RustCall.is_rust_helpers_available()
             @testset "Box Creation and Drop" begin
-                box = RustBox(Int32(42))
-                @test is_valid(box)
+                box = RustCall.RustBox(Int32(42))
+                @test RustCall.is_valid(box)
 
                 # Verify the value was stored correctly (if we had a getter)
-                drop!(box)
-                @test is_dropped(box)
+                RustCall.drop!(box)
+                @test RustCall.is_dropped(box)
             end
 
             @testset "Rc Clone and Drop" begin
-                rc1 = RustRc(Int32(100))
-                @test is_valid(rc1)
+                rc1 = RustCall.RustRc(Int32(100))
+                @test RustCall.is_valid(rc1)
 
-                rc2 = clone(rc1)
-                @test is_valid(rc2)
+                rc2 = RustCall.clone(rc1)
+                @test RustCall.is_valid(rc2)
                 @test rc1.ptr == rc2.ptr
 
-                drop!(rc1)
-                @test is_valid(rc2)
+                RustCall.drop!(rc1)
+                @test RustCall.is_valid(rc2)
 
-                drop!(rc2)
-                @test is_dropped(rc2)
+                RustCall.drop!(rc2)
+                @test RustCall.is_dropped(rc2)
             end
 
             @testset "Arc Clone and Drop" begin
-                arc1 = RustArc(Int32(200))
-                @test is_valid(arc1)
+                arc1 = RustCall.RustArc(Int32(200))
+                @test RustCall.is_valid(arc1)
 
-                arc2 = clone(arc1)
-                @test is_valid(arc2)
+                arc2 = RustCall.clone(arc1)
+                @test RustCall.is_valid(arc2)
 
-                drop!(arc1)
-                @test is_valid(arc2)
+                RustCall.drop!(arc1)
+                @test RustCall.is_valid(arc2)
 
-                drop!(arc2)
-                @test is_dropped(arc2)
+                RustCall.drop!(arc2)
+                @test RustCall.is_dropped(arc2)
             end
 
             @testset "Vec Creation and Conversion" begin
                 # Check if Vec functions are available
                 vec_functions_available = false
-                if is_rust_helpers_available()
-                    lib = get_rust_helpers_lib()
+                if RustCall.is_rust_helpers_available()
+                    lib = RustCall.get_rust_helpers_lib()
                     fn_ptr = Libdl.dlsym(lib, :rust_vec_new_from_array_i32; throw_error=false)
                     vec_functions_available = (fn_ptr !== nothing && fn_ptr != C_NULL)
                 end
 
                 if vec_functions_available
                     julia_vec = Int32[1, 2, 3, 4, 5]
-                    rust_vec = RustVec(julia_vec)
+                    rust_vec = RustCall.RustVec(julia_vec)
 
                     @test length(rust_vec) == 5
-                    @test is_valid(rust_vec)
+                    @test RustCall.is_valid(rust_vec)
 
                     # Test element access
                     @test rust_vec[1] == 1
@@ -147,8 +147,8 @@ end
                     back_to_julia = Vector(rust_vec)
                     @test back_to_julia == julia_vec
 
-                    drop!(rust_vec)
-                    @test is_dropped(rust_vec)
+                    RustCall.drop!(rust_vec)
+                    @test RustCall.is_dropped(rust_vec)
                 else
                     @warn "Vec functions not available in Rust helpers library"
                 end
@@ -160,10 +160,10 @@ end
 
     @testset "Error Handling" begin
         # Test that errors are handled gracefully when library is not available
-        if !is_rust_helpers_available()
-            @test_throws ErrorException RustBox(Int32(42))
-            @test_throws ErrorException RustRc(Int32(100))
-            @test_throws ErrorException RustArc(Int32(200))
+        if !RustCall.is_rust_helpers_available()
+            @test_throws ErrorException RustCall.RustBox(Int32(42))
+            @test_throws ErrorException RustCall.RustRc(Int32(100))
+            @test_throws ErrorException RustCall.RustArc(Int32(200))
         end
     end
 end

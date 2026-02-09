@@ -53,17 +53,17 @@ const SAMPLE_CRATE_PATH = joinpath(dirname(@__DIR__), "examples", "sample_crate"
         empty!(RustCall.HOT_RELOAD_REGISTRY)
 
         # Initially no crates should be registered
-        @test isempty(list_hot_reload_crates())
+        @test isempty(RustCall.list_hot_reload_crates())
 
         # Test global enable/disable
-        set_hot_reload_global(true)
+        RustCall.set_hot_reload_global(true)
         @test RustCall.HOT_RELOAD_ENABLED[]
 
-        set_hot_reload_global(false)
+        RustCall.set_hot_reload_global(false)
         @test !RustCall.HOT_RELOAD_ENABLED[]
 
         # Re-enable for other tests
-        set_hot_reload_global(true)
+        RustCall.set_hot_reload_global(true)
     end
 
     @testset "Library filename" begin
@@ -90,7 +90,7 @@ const SAMPLE_CRATE_PATH = joinpath(dirname(@__DIR__), "examples", "sample_crate"
         empty!(RustCall.HOT_RELOAD_REGISTRY)
 
         # Non-registered crate should return false
-        @test !is_hot_reload_enabled("NonExistentLib")
+        @test !RustCall.is_hot_reload_enabled("NonExistentLib")
     end
 
     @testset "Per-library reload lock" begin
@@ -172,23 +172,23 @@ end
 
         try
             # Enable hot reload
-            state = enable_hot_reload("SampleCrateHotReload", SAMPLE_CRATE_PATH)
+            state = RustCall.enable_hot_reload("SampleCrateHotReload", SAMPLE_CRATE_PATH)
 
             @test state !== nothing
             @test state.enabled
             @test haskey(RustCall.HOT_RELOAD_REGISTRY, "SampleCrateHotReload")
-            @test is_hot_reload_enabled("SampleCrateHotReload")
-            @test "SampleCrateHotReload" in list_hot_reload_crates()
+            @test RustCall.is_hot_reload_enabled("SampleCrateHotReload")
+            @test "SampleCrateHotReload" in RustCall.list_hot_reload_crates()
 
             # Disable hot reload
-            disable_hot_reload("SampleCrateHotReload")
+            RustCall.disable_hot_reload("SampleCrateHotReload")
             sleep(0.1)  # Give task time to stop
 
             @test !RustCall.HOT_RELOAD_REGISTRY["SampleCrateHotReload"].enabled
 
         finally
             # Clean up
-            disable_all_hot_reload()
+            RustCall.disable_all_hot_reload()
             sleep(0.1)
             empty!(RustCall.HOT_RELOAD_REGISTRY)
         end
@@ -199,7 +199,7 @@ end
         empty!(RustCall.HOT_RELOAD_REGISTRY)
 
         try
-            state = enable_hot_reload("SampleCrateCheck", SAMPLE_CRATE_PATH)
+            state = RustCall.enable_hot_reload("SampleCrateCheck", SAMPLE_CRATE_PATH)
 
             # Initially no changes (we just recorded the times)
             @test !RustCall.check_for_changes(state)
@@ -212,7 +212,7 @@ end
             end
 
         finally
-            disable_all_hot_reload()
+            RustCall.disable_all_hot_reload()
             sleep(0.1)
             empty!(RustCall.HOT_RELOAD_REGISTRY)
         end
@@ -230,7 +230,7 @@ end
         end
 
         try
-            state = enable_hot_reload(
+            state = RustCall.enable_hot_reload(
                 "SampleCrateCallback",
                 SAMPLE_CRATE_PATH,
                 callback = my_callback
@@ -240,7 +240,7 @@ end
             @test state.rebuild_callback === my_callback
 
         finally
-            disable_all_hot_reload()
+            RustCall.disable_all_hot_reload()
             sleep(0.1)
             empty!(RustCall.HOT_RELOAD_REGISTRY)
         end

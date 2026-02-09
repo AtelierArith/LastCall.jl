@@ -3,7 +3,7 @@ using RustCall
 using Test
 
 @testset "Julia to Rust Generic" begin
-    if !check_rustc_available()
+    if !RustCall.check_rustc_available()
         @warn "rustc not found, skipping julia_to_rust_generic tests"
         return
     end

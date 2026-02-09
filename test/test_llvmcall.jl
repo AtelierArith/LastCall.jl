@@ -99,7 +99,7 @@ using Test
             }
             """
 
-            info = compile_and_register_rust_function(code, "llvm_test_add")
+            info = RustCall.compile_and_register_rust_function(code, "llvm_test_add")
             @test info.name == "llvm_test_add"
             @test info.return_type == Int32
             @test info.arg_types == [Int32, Int32]
@@ -131,12 +131,12 @@ using Test
             """
 
             # Register for @rust_llvm
-            compile_and_register_rust_function("""
+            RustCall.compile_and_register_rust_function("""
             #[no_mangle]
             pub extern "C" fn llvm_add(a: i32, b: i32) -> i32 { a + b }
             """, "llvm_add")
 
-            compile_and_register_rust_function("""
+            RustCall.compile_and_register_rust_function("""
             #[no_mangle]
             pub extern "C" fn llvm_mul(a: i32, b: i32) -> i32 { a * b }
             """, "llvm_mul")
@@ -201,7 +201,7 @@ using Test
             end
 
             # Test error for argument count mismatch
-            compile_and_register_rust_function("""
+            RustCall.compile_and_register_rust_function("""
             #[no_mangle]
             pub extern "C" fn test_two_args(a: i32, b: i32) -> i32 { a + b }
             """, "test_two_args")

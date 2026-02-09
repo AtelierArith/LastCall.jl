@@ -8,8 +8,8 @@ using Test
 
     @testset "generate_cargo_toml" begin
         deps = [
-            DependencySpec("ndarray", version="0.15"),
-            DependencySpec("serde", version="1.0", features=["derive", "std"])
+            RustCall.DependencySpec("ndarray", version="0.15"),
+            RustCall.DependencySpec("serde", version="1.0", features=["derive", "std"])
         ]
 
         cargo_toml = RustCall.generate_cargo_toml("test_project", deps, "2021")
@@ -74,12 +74,12 @@ using Test
 
     @testset "format_dependency_line" begin
         # Simple version
-        dep1 = DependencySpec("ndarray", version="0.15")
+        dep1 = RustCall.DependencySpec("ndarray", version="0.15")
         line1 = RustCall.format_dependency_line(dep1)
         @test line1 == "ndarray = \"0.15\""
 
         # Version with features
-        dep2 = DependencySpec("serde", version="1.0", features=["derive"])
+        dep2 = RustCall.DependencySpec("serde", version="1.0", features=["derive"])
         line2 = RustCall.format_dependency_line(dep2)
         @test occursin("serde", line2)
         @test occursin("version", line2)
@@ -87,23 +87,23 @@ using Test
         @test occursin("derive", line2)
 
         # Git dependency
-        dep3 = DependencySpec("my_crate", git="https://github.com/user/repo.git")
+        dep3 = RustCall.DependencySpec("my_crate", git="https://github.com/user/repo.git")
         line3 = RustCall.format_dependency_line(dep3)
         @test occursin("git", line3)
         @test occursin("https://github.com/user/repo.git", line3)
 
         # Path dependency
-        dep4 = DependencySpec("local_crate", path="../local_crate")
+        dep4 = RustCall.DependencySpec("local_crate", path="../local_crate")
         line4 = RustCall.format_dependency_line(dep4)
         @test occursin("path", line4)
         @test occursin("../local_crate", line4)
     end
 
     @testset "create_cargo_project" begin
-        deps = [DependencySpec("ndarray", version="0.15")]
+        deps = [RustCall.DependencySpec("ndarray", version="0.15")]
 
         # Create a temporary project
-        project = create_cargo_project("test_cargo_project", deps)
+        project = RustCall.create_cargo_project("test_cargo_project", deps)
 
         try
             # Check project structure
@@ -128,8 +128,8 @@ using Test
     end
 
     @testset "write_rust_code_to_project" begin
-        deps = [DependencySpec("ndarray", version="0.15")]
-        project = create_cargo_project("test_write_project", deps)
+        deps = [RustCall.DependencySpec("ndarray", version="0.15")]
+        project = RustCall.create_cargo_project("test_write_project", deps)
 
         try
             code = """
@@ -161,13 +161,13 @@ using Test
 
     @testset "hash_dependencies" begin
         deps1 = [
-            DependencySpec("ndarray", version="0.15"),
-            DependencySpec("serde", version="1.0")
+            RustCall.DependencySpec("ndarray", version="0.15"),
+            RustCall.DependencySpec("serde", version="1.0")
         ]
 
         deps2 = [
-            DependencySpec("serde", version="1.0"),
-            DependencySpec("ndarray", version="0.15")
+            RustCall.DependencySpec("serde", version="1.0"),
+            RustCall.DependencySpec("ndarray", version="0.15")
         ]
 
         # Same dependencies in different order should produce same hash
@@ -176,7 +176,7 @@ using Test
         @test hash1 == hash2
 
         # Different dependencies should produce different hash
-        deps3 = [DependencySpec("ndarray", version="0.16")]
+        deps3 = [RustCall.DependencySpec("ndarray", version="0.16")]
         hash3 = RustCall.hash_dependencies(deps3)
         @test hash1 != hash3
     end
@@ -187,19 +187,19 @@ end
     @testset "validate_dependencies" begin
         # Valid dependencies
         deps_valid = [
-            DependencySpec("ndarray", version="0.15"),
-            DependencySpec("my_crate", git="https://github.com/user/repo.git")
+            RustCall.DependencySpec("ndarray", version="0.15"),
+            RustCall.DependencySpec("my_crate", git="https://github.com/user/repo.git")
         ]
         @test_nowarn RustCall.validate_dependencies(deps_valid)
 
         # Invalid: no version, git, or path
-        deps_invalid = [DependencySpec("bad_dep")]
-        @test_throws DependencyResolutionError RustCall.validate_dependencies(deps_invalid)
+        deps_invalid = [RustCall.DependencySpec("bad_dep")]
+        @test_throws RustCall.DependencyResolutionError RustCall.validate_dependencies(deps_invalid)
     end
 
     @testset "resolve_version_conflict" begin
-        dep1 = DependencySpec("serde", version="1.0", features=["derive"])
-        dep2 = DependencySpec("serde", version="1.0", features=["std"])
+        dep1 = RustCall.DependencySpec("serde", version="1.0", features=["derive"])
+        dep2 = RustCall.DependencySpec("serde", version="1.0", features=["std"])
 
         resolved = RustCall.resolve_version_conflict(dep1, dep2)
 
@@ -236,11 +236,11 @@ end
         @test isdir(cache_dir)
 
         # Test clearing cache
-        clear_cargo_cache()
+        RustCall.clear_cargo_cache()
         @test isdir(cache_dir)  # Directory should still exist
 
         # Test cache size (should be 0 after clear)
-        size = get_cargo_cache_size()
+        size = RustCall.get_cargo_cache_size()
         @test size == 0
     end
 end

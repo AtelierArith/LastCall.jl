@@ -79,7 +79,7 @@ crate_path = joinpath(@__DIR__, "my_rust_crate")
 bindings_path = joinpath(dirname(@__DIR__), "src", "generated", "RustBindings.jl")
 
 # Generate bindings
-write_bindings_to_file(
+RustCall.write_bindings_to_file(
     crate_path,
     bindings_path,
     output_module_name = "RustBindings",
@@ -186,16 +186,16 @@ MyPackage.multiply(1.0, 2.0)
 
 ```julia
 # Clear the cache
-clear_cache()
+RustCall.clear_cache()
 
 # Check cache size
-get_cache_size()
+RustCall.get_cache_size()
 
 # List cached libraries
-list_cached_libraries()
+RustCall.list_cached_libraries()
 
 # Clean up old cache entries
-cleanup_old_cache(max_age_days=30)
+RustCall.cleanup_old_cache(max_age_days=30)
 ```
 
 ## Troubleshooting
@@ -281,7 +281,7 @@ test = ["Test"]
 # deps/build.jl
 using RustCall
 
-write_bindings_to_file(
+RustCall.write_bindings_to_file(
     joinpath(@__DIR__, "rust_crate"),
     joinpath(dirname(@__DIR__), "src", "generated", "Bindings.jl"),
     output_module_name = "Bindings",

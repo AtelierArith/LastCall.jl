@@ -4,12 +4,12 @@ using RustCall
 using Test
 
 # Import internal functions for testing
-import RustCall: GENERIC_FUNCTION_REGISTRY, MONOMORPHIZED_FUNCTIONS
-import RustCall: TraitBound, TypeConstraints, GenericFunctionInfo
-import RustCall: parse_trait_bounds, parse_single_trait, parse_where_clause
-import RustCall: parse_inline_constraints, parse_generic_function
-import RustCall: constraints_to_rust_string, merge_constraints
-import RustCall: _find_matching_angle_bracket
+using RustCall: GENERIC_FUNCTION_REGISTRY, MONOMORPHIZED_FUNCTIONS
+using RustCall: TraitBound, TypeConstraints, GenericFunctionInfo
+using RustCall: parse_trait_bounds, parse_single_trait, parse_where_clause
+using RustCall: parse_inline_constraints, parse_generic_function
+using RustCall: constraints_to_rust_string, merge_constraints
+using RustCall: _find_matching_angle_bracket
 
 # ============================================================================
 # Bracket-counting Helper Tests
@@ -381,14 +381,14 @@ end
             TraitBound("Clone", String[])
         ]))
         code = "pub fn test_func<T: Copy + Clone>(x: T) -> T { x }"
-        info = register_generic_function("test_with_constraints", code, [:T], constraints)
+        info = RustCall.register_generic_function("test_with_constraints", code, [:T], constraints)
 
         @test info.name == "test_with_constraints"
         @test length(info.constraints[:T].bounds) == 2
 
         # Test backward compatibility with Dict{Symbol, String}
         legacy_constraints = Dict(:T => "Copy + Clone")
-        info = register_generic_function("test_legacy", code, [:T], legacy_constraints)
+        info = RustCall.register_generic_function("test_legacy", code, [:T], legacy_constraints)
 
         @test info.name == "test_legacy"
         @test length(info.constraints[:T].bounds) == 2
@@ -410,10 +410,10 @@ end
         }
         """
 
-        register_generic_function("identity", code, [:T])
+        RustCall.register_generic_function("identity", code, [:T])
 
-        @test is_generic_function("identity")
-        @test !is_generic_function("nonexistent")
+        @test RustCall.is_generic_function("identity")
+        @test !RustCall.is_generic_function("nonexistent")
 
         # Check that it's in the registry
         @test haskey(GENERIC_FUNCTION_REGISTRY, "identity")
@@ -430,14 +430,14 @@ end
             x
         }
         """
-        register_generic_function("identity", code, [:T])
+        RustCall.register_generic_function("identity", code, [:T])
 
         # Test inference with Int32
-        type_params = infer_type_parameters("identity", [Int32])
+        type_params = RustCall.infer_type_parameters("identity", [Int32])
         @test type_params == Dict(:T => Int32)
 
         # Test inference with Float64
-        type_params = infer_type_parameters("identity", [Float64])
+        type_params = RustCall.infer_type_parameters("identity", [Float64])
         @test type_params == Dict(:T => Float64)
     end
 
@@ -450,7 +450,7 @@ end
         }
         """
 
-        specialized = specialize_generic_code(code, Dict(:T => Int32))
+        specialized = RustCall.specialize_generic_code(code, Dict(:T => Int32))
 
         # Check that T is replaced with i32
         @test occursin("i32", specialized)
@@ -469,7 +469,7 @@ end
             slice[0]
         }
         """
-        specialized = specialize_generic_code(code, Dict(:T => Float64))
+        specialized = RustCall.specialize_generic_code(code, Dict(:T => Float64))
         @test !occursin("<T:", specialized)  # generic params removed
         @test occursin("f64", specialized)
         @test occursin("fn sum_vec(", specialized)
@@ -480,7 +480,7 @@ end
             x[0][0]
         }
         """
-        specialized = specialize_generic_code(code, Dict(:T => Int32))
+        specialized = RustCall.specialize_generic_code(code, Dict(:T => Int32))
         @test !occursin("<T>", specialized)
         @test occursin("Vec<Vec<i32>>", specialized)
         @test occursin("fn nested(", specialized)
@@ -491,7 +491,7 @@ end
             map[key]
         }
         """
-        specialized = specialize_generic_code(code, Dict(:K => Int32, :V => Float64))
+        specialized = RustCall.specialize_generic_code(code, Dict(:K => Int32, :V => Float64))
         @test occursin("HashMap<i32, f64>", specialized)
         @test occursin("fn get_value(", specialized)
 
@@ -501,7 +501,7 @@ end
             pub fn get(&self) -> T { self.value }
         }
         """
-        specialized = specialize_generic_code(code, Dict(:T => Int32))
+        specialized = RustCall.specialize_generic_code(code, Dict(:T => Int32))
         @test !occursin("impl<", specialized)
         @test occursin("impl", specialized)
         @test occursin("i32", specialized)
@@ -514,7 +514,7 @@ end
             items[0].unwrap().unwrap()
         }
         """
-        specialized = specialize_generic_code(code, Dict(:T => Int32))
+        specialized = RustCall.specialize_generic_code(code, Dict(:T => Int32))
         @test occursin("Vec<Option<Result<i32, String>>>", specialized)
         @test occursin("fn unwrap_deep(", specialized)
         @test !occursin("<T>", specialized)
@@ -525,7 +525,7 @@ end
             items.iter().copied().fold(T::default(), |a, b| a + b)
         }
         """
-        specialized = specialize_generic_code(code, Dict(:T => Float64))
+        specialized = RustCall.specialize_generic_code(code, Dict(:T => Float64))
         @test occursin("fn sum(", specialized)
         @test !occursin("<T:", specialized)
         @test occursin("f64", specialized)
@@ -536,7 +536,7 @@ end
             pub fn convert(&self) -> Vec<Option<T>> { self.value.clone().into() }
         }
         """
-        specialized = specialize_generic_code(code, Dict(:T => Int64))
+        specialized = RustCall.specialize_generic_code(code, Dict(:T => Int64))
         @test !occursin("impl<", specialized)
         @test occursin("impl", specialized)
         @test occursin("i64", specialized)
@@ -547,14 +547,14 @@ end
             a
         }
         """
-        specialized = specialize_generic_code(code, Dict(:K => Int32, :V => Float64))
+        specialized = RustCall.specialize_generic_code(code, Dict(:K => Int32, :V => Float64))
         @test occursin("HashMap<i32, Vec<f64>>", specialized)
         @test occursin("fn merge(", specialized)
     end
 
     @testset "Generic Function Detection" begin
         # Test that generic functions are detected in rust"" blocks
-        if check_rustc_available()
+        if RustCall.check_rustc_available()
             rust"""
             #[no_mangle]
             pub extern "C" fn test_identity<T>(x: T) -> T {
@@ -572,7 +572,7 @@ end
     end
 
     @testset "Monomorphization" begin
-        if check_rustc_available()
+        if RustCall.check_rustc_available()
             # Register a simple generic function
             code = """
             #[no_mangle]
@@ -580,11 +580,11 @@ end
                 x
             }
             """
-            register_generic_function("test_identity", code, [:T])
+            RustCall.register_generic_function("test_identity", code, [:T])
 
             # Test monomorphization with Int32
             type_params = Dict(:T => Int32)
-            info = monomorphize_function("test_identity", type_params)
+            info = RustCall.monomorphize_function("test_identity", type_params)
 
             @test info.name != "test_identity"  # Should have a specialized name
             @test occursin("i32", info.name)  # Should contain type suffix
@@ -593,7 +593,7 @@ end
             @test info.func_ptr != C_NULL
 
             # Test that caching works
-            info2 = monomorphize_function("test_identity", type_params)
+            info2 = RustCall.monomorphize_function("test_identity", type_params)
             @test info.name == info2.name
             @test info.func_ptr == info2.func_ptr
         else
@@ -602,7 +602,7 @@ end
     end
 
     @testset "Call Generic Function" begin
-        if check_rustc_available()
+        if RustCall.check_rustc_available()
             # Register and test calling a generic function
             code = """
             #[no_mangle]
@@ -610,20 +610,20 @@ end
                 a + b
             }
             """
-            register_generic_function("test_add", code, [:T])
+            RustCall.register_generic_function("test_add", code, [:T])
 
             # Note: This test might fail because Rust generics with + operator
             # require trait bounds. For now, we'll test the infrastructure.
             # A working example would need: fn add<T: Copy + Add<Output = T>>(a: T, b: T) -> T
 
-            @test is_generic_function("test_add")
+            @test RustCall.is_generic_function("test_add")
         else
             @warn "rustc not available, skipping generic function call test"
         end
     end
 
     @testset "Multiple Type Parameters" begin
-        if check_rustc_available()
+        if RustCall.check_rustc_available()
             # Test with multiple type parameters
             code = """
             #[no_mangle]
@@ -631,10 +631,10 @@ end
                 a
             }
             """
-            register_generic_function("test_pair", code, [:T, :U])
+            RustCall.register_generic_function("test_pair", code, [:T, :U])
 
             # Test inference
-            type_params = infer_type_parameters("test_pair", [Int32, Float64])
+            type_params = RustCall.infer_type_parameters("test_pair", [Int32, Float64])
             @test type_params[:T] == Int32
             @test type_params[:U] == Float64
         else

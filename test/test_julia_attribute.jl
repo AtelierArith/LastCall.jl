@@ -125,7 +125,7 @@ using Test
         @test expr.head == :block
     end
 
-    if check_rustc_available()
+    if RustCall.check_rustc_available()
         @testset "Integration: Simple Function" begin
             # Test that #[julia] attribute works end-to-end
             rust"""

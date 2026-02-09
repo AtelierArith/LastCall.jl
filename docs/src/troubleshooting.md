@@ -96,7 +96,7 @@ error: expected one of ...
 3. Check error message in detail:
    ```julia
    # Clear cache and recompile
-   clear_cache()
+   RustCall.clear_cache()
    rust"""
    // Fixed code
    """
@@ -155,7 +155,7 @@ Function 'my_function' not found in library
 2. Ensure `#[no_mangle]` attribute is present
 3. Verify library compiled correctly:
    ```julia
-   clear_cache()
+   RustCall.clear_cache()
    rust"""
    #[no_mangle]
    pub extern "C" fn my_test_function() -> i32 { 42 }
@@ -254,23 +254,23 @@ Debug logging shows detailed information about:
 ### 2. Clear cache
 
 ```julia
-clear_cache()
+RustCall.clear_cache()
 ```
 
 ### 3. Check library status
 
 ```julia
 # List cached libraries
-list_cached_libraries()
+RustCall.list_cached_libraries()
 
 # Check cache size
-get_cache_size()
+RustCall.get_cache_size()
 ```
 
 ### 4. Check type information
 
 ```julia
 # Check type mapping
-rusttype_to_julia(:i32)  # => Int32
-juliatype_to_rust(Int32)  # => "i32"
+RustCall.rusttype_to_julia(:i32)  # => Int32
+RustCall.juliatype_to_rust(Int32)  # => "i32"
 ```

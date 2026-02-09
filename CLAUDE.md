@@ -94,3 +94,4 @@ Two jobs in `.github/workflows/CI.yml`:
 - Keep generated/binding code deterministic and cache-aware
 - Add tests alongside new functionality; include regression coverage for macro/parsing changes
 - `Cxx.jl/` and `julia/` are vendored upstream trees — do not edit for RustCall features
+- **Minimal exports**: Only macros (`@rust`, `@rust_str`, `@irust`, `@irust_str`, `@rust_llvm`, `@rust_crate`) are exported. All other identifiers should be accessed via `RustCall.XXX` or `using RustCall: XXX`. Do not add new `export` statements unless the identifier is a macro intended for end-user use.

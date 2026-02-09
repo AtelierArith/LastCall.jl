@@ -3,7 +3,7 @@ using RustCall
 using Test
 
 @testset "Phase 4: ndarray Example" begin
-    if !check_rustc_available()
+    if !RustCall.check_rustc_available()
         @warn "rustc not found, skipping phase4_ndarray tests"
         return
     end

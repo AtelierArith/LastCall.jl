@@ -686,15 +686,15 @@ When issues occur, use these debugging techniques:
 
 ```julia
 # Check cache status
-cache_size = get_cache_size()
+cache_size = RustCall.get_cache_size()
 println("Current cache size: $cache_size libraries")
 
 # List cached libraries
-cached = list_cached_libraries()
+cached = RustCall.list_cached_libraries()
 println("Cached libraries: $(length(cached)) items")
 
 # Clear cache if needed
-clear_cache()
+RustCall.clear_cache()
 println("Cache cleared")
 ```
 
@@ -711,11 +711,12 @@ pub extern "C" fn identity<T>(x: T) -> T {
 }
 """
 
-register_generic_function("identity", code, [:T])
+RustCall.register_generic_function("identity", code, [:T])
 
 # Call with different types - automatic monomorphization
-result_i32 = call_generic_function("identity", Int32(42))  # => 42
-result_f64 = call_generic_function("identity", 3.14)       # => 3.14
+result_i32 = RustCall.call_generic_function("identity", Int32(42))  # => 42
+result_f64 = RustCall.call_generic_function("identity", 3.14)       # => 3.14
+
 
 println("identity(Int32(42)) = $result_i32")
 println("identity(3.14) = $result_f64")

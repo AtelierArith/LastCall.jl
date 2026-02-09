@@ -10,7 +10,7 @@ const SAMPLE_CRATE_PATH = joinpath(dirname(@__DIR__), "examples", "sample_crate"
 
     @testset "CrateBindingOptions" begin
         # Test default options
-        opts = CrateBindingOptions()
+        opts = RustCall.CrateBindingOptions()
         @test opts.output_module_name === nothing
         @test opts.output_path === nothing
         @test opts.use_wrapper_crate == true
@@ -18,7 +18,7 @@ const SAMPLE_CRATE_PATH = joinpath(dirname(@__DIR__), "examples", "sample_crate"
         @test opts.cache_enabled == true
 
         # Test custom options
-        opts2 = CrateBindingOptions(
+        opts2 = RustCall.CrateBindingOptions(
             output_module_name = "MyModule",
             build_release = false,
             cache_enabled = false
@@ -34,7 +34,7 @@ const SAMPLE_CRATE_PATH = joinpath(dirname(@__DIR__), "examples", "sample_crate"
             return
         end
 
-        info = scan_crate(SAMPLE_CRATE_PATH)
+        info = RustCall.scan_crate(SAMPLE_CRATE_PATH)
 
         @test info.name == "sample_crate"
         @test info.path == abspath(SAMPLE_CRATE_PATH)
@@ -123,8 +123,8 @@ const SAMPLE_CRATE_PATH = joinpath(dirname(@__DIR__), "examples", "sample_crate"
             return
         end
 
-        info = scan_crate(SAMPLE_CRATE_PATH)
-        opts = CrateBindingOptions()
+        info = RustCall.scan_crate(SAMPLE_CRATE_PATH)
+        opts = RustCall.CrateBindingOptions()
 
         wrapper_path = RustCall.create_wrapper_crate(info, opts)
 
@@ -150,7 +150,7 @@ const SAMPLE_CRATE_PATH = joinpath(dirname(@__DIR__), "examples", "sample_crate"
             return
         end
 
-        info = scan_crate(SAMPLE_CRATE_PATH)
+        info = RustCall.scan_crate(SAMPLE_CRATE_PATH)
         hash1 = RustCall.compute_crate_hash(info)
 
         # Hash should be deterministic
@@ -182,7 +182,7 @@ end
     @testset "Full binding generation (may take a while)" begin
         # This test may take some time as it compiles Rust code
         try
-            bindings = generate_bindings(SAMPLE_CRATE_PATH, cache_enabled=false)
+            bindings = RustCall.generate_bindings(SAMPLE_CRATE_PATH, cache_enabled=false)
             @test bindings isa Expr
             @test bindings.head == :module || (bindings.head == :block && any(e -> e isa Expr && e.head == :module, bindings.args))
         catch e
@@ -280,7 +280,7 @@ try
         project_dir = dirname(@__DIR__)  # Get the project directory
 
         # First, generate bindings to get the module code as a string
-        bindings = generate_bindings(abspath(SAMPLE_CRATE_PATH),
+        bindings = RustCall.generate_bindings(abspath(SAMPLE_CRATE_PATH),
             output_module_name = "SampleCratePropertyTest",
             cache_enabled = true)
 
@@ -368,7 +368,7 @@ end
 
     @testset "emit_crate_module_code" begin
         # Test generating module code as a string
-        info = scan_crate(SAMPLE_CRATE_PATH)
+        info = RustCall.scan_crate(SAMPLE_CRATE_PATH)
 
         # Test with absolute path
         code = RustCall.emit_crate_module_code(info, "/tmp/test_lib.so")
@@ -511,7 +511,7 @@ end
         output_path = joinpath(output_dir, "TestBindings.jl")
 
         try
-            result_path = write_bindings_to_file(
+            result_path = RustCall.write_bindings_to_file(
                 SAMPLE_CRATE_PATH,
                 output_path,
                 output_module_name = "TestBindings"
@@ -538,7 +538,7 @@ end
         lib_rel_path = "../deps/lib"
 
         try
-            result_path = write_bindings_to_file(
+            result_path = RustCall.write_bindings_to_file(
                 SAMPLE_CRATE_PATH,
                 output_path,
                 output_module_name = "RelativeBindings",
