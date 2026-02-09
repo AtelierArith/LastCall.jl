@@ -47,6 +47,46 @@ using Test
         @test key1 == expected_key
     end
 
+    @testset "stable_content_hash utility" begin
+        # stable_content_hash must be deterministic and session-stable
+        h1 = RustCall.stable_content_hash("hello")
+        h2 = RustCall.stable_content_hash("hello")
+        @test h1 == h2
+        @test length(h1) == 64  # SHA-256 → 64 hex chars
+
+        # Different inputs produce different hashes
+        h3 = RustCall.stable_content_hash("world")
+        @test h1 != h3
+    end
+
+    @testset "Cross-process cache key stability" begin
+        # Verify that generate_cache_key and stable_content_hash produce
+        # identical results in a separate Julia process (guards against
+        # accidental use of session-randomized hash()).
+        code = "fn test() -> i32 { 42 }"
+        compiler = RustCall.get_default_compiler()
+        key_here = RustCall.generate_cache_key(code, compiler)
+
+        project_dir = pkgdir(RustCall)
+        key_subprocess = readchomp(`$(Base.julia_cmd()) --project=$project_dir -e "
+            using RustCall
+            code = \"fn test() -> i32 { 42 }\"
+            compiler = RustCall.get_default_compiler()
+            print(RustCall.generate_cache_key(code, compiler))
+        "`)
+
+        @test key_here == key_subprocess
+
+        # Also verify stable_content_hash directly
+        hash_here = RustCall.stable_content_hash("cross-process test data")
+        hash_subprocess = readchomp(`$(Base.julia_cmd()) --project=$project_dir -e "
+            using RustCall
+            print(RustCall.stable_content_hash(\"cross-process test data\"))
+        "`)
+
+        @test hash_here == hash_subprocess
+    end
+
     @testset "Cache Operations" begin
         # Test cache size
         initial_size = get_cache_size()
