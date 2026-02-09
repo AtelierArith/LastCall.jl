@@ -270,4 +270,54 @@ using Test
         # Should emit a warning about falling back to entire block
         @test_warn "Failed to extract function" RustCall._detect_and_register_generic_functions(code, "test_lib")
     end
+
+    @testset "extract_block_at is accessible from module scope" begin
+        # Verify that extract_block_at is defined in the RustCall module (issue #82)
+        @test isdefined(RustCall, :extract_block_at)
+        @test RustCall.extract_block_at isa Function
+    end
+
+    @testset "extract_block_at extracts balanced brace blocks" begin
+        code = """
+        pub struct Point {
+            x: f64,
+            y: f64,
+        }
+        """
+        m = match(r"pub struct Point", code)
+        result = RustCall.extract_block_at(code, m.offset)
+        @test result !== nothing
+        @test occursin("pub struct Point", result)
+        @test occursin("x: f64", result)
+        @test occursin("y: f64", result)
+    end
+
+    @testset "extract_block_at handles nested braces" begin
+        code = """
+        impl Point {
+            fn new(x: f64, y: f64) -> Self {
+                Point { x, y }
+            }
+        }
+        """
+        m = match(r"impl Point", code)
+        result = RustCall.extract_block_at(code, m.offset)
+        @test result !== nothing
+        @test occursin("impl Point", result)
+        @test occursin("fn new", result)
+        @test occursin("Point { x, y }", result)
+    end
+
+    @testset "extract_block_at returns nothing when no brace found" begin
+        code = "fn no_body()"
+        result = RustCall.extract_block_at(code, 1)
+        @test result === nothing
+    end
+
+    @testset "extract_block_at handles tuple structs" begin
+        code = "pub struct Wrapper(i32);"
+        result = RustCall.extract_block_at(code, 1)
+        @test result !== nothing
+        @test occursin("Wrapper", result)
+    end
 end

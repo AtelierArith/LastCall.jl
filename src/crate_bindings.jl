@@ -1,9 +1,20 @@
 # External crate bindings generator (Maturin-like feature)
 # This module provides automatic Julia bindings generation for external Rust crates
 # that use the #[julia] attribute from juliacall_macros.
+#
+# Dependencies (must be included before this file in RustCall.jl):
+#   - structs.jl: extract_block_at, parse_struct_fields, parse_methods_in_impl
+#   - julia_functions.jl: parse_julia_functions_from_source
 
 using TOML
 using SHA
+
+# Validate that required dependencies are available at include time.
+# If structs.jl failed to load or was included after this file, catch it early
+# rather than at runtime when @rust_crate is used.
+if !isdefined(@__MODULE__, :extract_block_at)
+    error("crate_bindings.jl requires extract_block_at from structs.jl — check include order in RustCall.jl")
+end
 
 # ============================================================================
 # Type Definitions
