@@ -397,13 +397,15 @@ using Test
         GC.@preserve data begin
             ptr = Ptr{Cvoid}(pointer(data))
             vec = RustVec{Int32}(ptr, UInt(5), UInt(5))
-            vec.dropped = true  # Mark as already dropped to prevent finalizer from freeing Julia-managed memory
 
             @test vec[1] == 10
             @test vec[2] == 20
             @test vec[5] == 50
             @test_throws BoundsError vec[0]
             @test_throws BoundsError vec[6]
+
+            # Mark as dropped after tests to prevent finalizer from freeing Julia-managed memory
+            vec.dropped = true
 
             # Test RustSlice
             slice = RustSlice{Int32}(Ptr{Int32}(ptr), UInt(5))
@@ -417,10 +419,11 @@ using Test
             GC.@preserve fdata begin
                 fptr = Ptr{Cvoid}(pointer(fdata))
                 fvec = RustVec{Float64}(fptr, UInt(3), UInt(3))
-                fvec.dropped = true  # Mark as already dropped to prevent finalizer from freeing Julia-managed memory
                 @test fvec[1] ≈ 1.5
                 @test fvec[2] ≈ 2.5
                 @test fvec[3] ≈ 3.5
+                # Mark as dropped after tests to prevent finalizer from freeing Julia-managed memory
+                fvec.dropped = true
             end
         end
     end
