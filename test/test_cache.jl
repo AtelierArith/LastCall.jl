@@ -47,6 +47,35 @@ using Test
         @test key1 == expected_key
     end
 
+    @testset "Cross-session cache key stability (#106)" begin
+        code = "fn test() -> i32 { 42 }"
+        compiler = RustCall.get_default_compiler()
+        key1 = RustCall.generate_cache_key(code, compiler)
+
+        # Spawn a separate Julia process and verify it produces the same key
+        project_dir = dirname(dirname(@__FILE__))
+        key2 = strip(read(`$(Base.julia_cmd()) --project=$project_dir -e "
+            using RustCall
+            code = \"fn test() -> i32 { 42 }\"
+            compiler = RustCall.get_default_compiler()
+            print(RustCall.generate_cache_key(code, compiler))
+        "`, String))
+
+        @test key1 == key2
+    end
+
+    @testset "stable_content_hash utility (#106)" begin
+        # stable_content_hash must be deterministic
+        h1 = RustCall.stable_content_hash("hello world")
+        h2 = RustCall.stable_content_hash("hello world")
+        @test h1 == h2
+        @test length(h1) == 64  # SHA256 hex length
+
+        # Different inputs → different hashes
+        h3 = RustCall.stable_content_hash("hello world!")
+        @test h1 != h3
+    end
+
     @testset "Cache Operations" begin
         # Test cache size
         initial_size = get_cache_size()
