@@ -162,9 +162,9 @@ end
         use ndarray::Array1;
         """
 
-        @test has_dependencies(code_with_deps)
+        @test RustCall.has_dependencies(code_with_deps)
 
-        deps = parse_dependencies_from_code(code_with_deps)
+        deps = RustCall.parse_dependencies_from_code(code_with_deps)
         @test length(deps) == 1
         @test deps[1].name == "ndarray"
         @test deps[1].version == "0.15"
@@ -179,9 +179,9 @@ end
         }
         """
 
-        @test !has_dependencies(code_without_deps)
+        @test !RustCall.has_dependencies(code_without_deps)
 
-        deps = parse_dependencies_from_code(code_without_deps)
+        deps = RustCall.parse_dependencies_from_code(code_without_deps)
         @test isempty(deps)
     end
 
@@ -195,6 +195,6 @@ end
         pub extern "C" fn test() -> i32 { 42 }
         """
 
-        @test !has_dependencies(code_with_comments)
+        @test !RustCall.has_dependencies(code_with_comments)
     end
 end

@@ -3,7 +3,7 @@ using RustCall
 using Test
 
 @testset "Basic Examples" begin
-    if !check_rustc_available()
+    if !RustCall.check_rustc_available()
         @warn "rustc not found, skipping basic examples tests"
         return
     end
@@ -125,28 +125,28 @@ using Test
     end
 
     @testset "Compiler Configuration" begin
-        compiler = RustCompiler(
+        compiler = RustCall.RustCompiler(
             optimization_level=3,
             emit_debug_info=false,
             debug_mode=false
         )
 
-        set_default_compiler(compiler)
-        @test get_default_compiler().optimization_level == 3
+        RustCall.set_default_compiler(compiler)
+        @test RustCall.get_default_compiler().optimization_level == 3
 
-        version = get_rustc_version()
+        version = RustCall.get_rustc_version()
         @test !isempty(version)
     end
 
     @testset "Cache Management" begin
-        cache_size = get_cache_size()
+        cache_size = RustCall.get_cache_size()
         @test cache_size >= 0
 
-        cached_libs = list_cached_libraries()
+        cached_libs = RustCall.list_cached_libraries()
         @test isa(cached_libs, Vector{String})
 
         # Clean up old cache (older than 30 days) - should not throw
-        removed = cleanup_old_cache(30)
+        removed = RustCall.cleanup_old_cache(30)
         @test removed >= 0
     end
 

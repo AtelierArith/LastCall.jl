@@ -246,13 +246,13 @@ For a more Rust-like approach, you can define functions that return `Result` typ
 
 ```julia
 # Create RustResult manually
-ok_result = RustResult{Int32, String}(true, Int32(42))
-is_ok(ok_result)  # => true
-unwrap(ok_result)  # => 42
+ok_result = RustCall.RustResult{Int32, String}(true, Int32(42))
+RustCall.is_ok(ok_result)  # => true
+RustCall.unwrap(ok_result)  # => 42
 
-err_result = RustResult{Int32, String}(false, "error message")
-is_err(err_result)  # => true
-unwrap_or(err_result, Int32(0))  # => 0
+err_result = RustCall.RustResult{Int32, String}(false, "error message")
+RustCall.is_err(err_result)  # => true
+RustCall.unwrap_or(err_result, Int32(0))  # => 0
 ```
 
 ### Converting to Exceptions
@@ -260,11 +260,11 @@ unwrap_or(err_result, Int32(0))  # => 0
 Use `result_to_exception` to convert `Result` to Julia exceptions:
 
 ```julia
-err_result = RustResult{Int32, String}(false, "division by zero")
+err_result = RustCall.RustResult{Int32, String}(false, "division by zero")
 try
-    value = result_to_exception(err_result)
+    value = RustCall.result_to_exception(err_result)
 catch e
-    if e isa RustError
+    if e isa RustCall.RustError
         println("Rust error: $(e.message)")
     end
 end
@@ -278,44 +278,44 @@ end
 
 ```julia
 # Rust helpers library required
-if is_rust_helpers_available()
+if RustCall.is_rust_helpers_available()
     # Create Box (usually returned from Rust functions)
     # Here as an example, actual usage is from Rust function return values
-    box = RustBox{Int32}(ptr)  # ptr obtained from Rust function
+    box = RustCall.RustBox{Int32}(ptr)  # ptr obtained from Rust function
 
     # Explicitly drop after use
-    drop!(box)
+    RustCall.drop!(box)
 end
 ```
 
 ### RustRc (Reference Counting, Single-threaded)
 
 ```julia
-if is_rust_helpers_available()
+if RustCall.is_rust_helpers_available()
     # Create Rc
-    rc1 = RustRc{Int32}(ptr)
+    rc1 = RustCall.RustRc{Int32}(ptr)
 
     # Clone to increment reference count
-    rc2 = clone(rc1)
+    rc2 = RustCall.clone(rc1)
 
     # Dropping one keeps the other valid
-    drop!(rc1)
-    @assert is_valid(rc2)  # Still valid
+    RustCall.drop!(rc1)
+    @assert RustCall.is_valid(rc2)  # Still valid
 
     # Drop last reference
-    drop!(rc2)
+    RustCall.drop!(rc2)
 end
 ```
 
 ### RustArc (Atomic Reference Counting, Thread-safe)
 
 ```julia
-if is_rust_helpers_available()
+if RustCall.is_rust_helpers_available()
     # Create Arc
-    arc1 = RustArc{Int32}(ptr)
+    arc1 = RustCall.RustArc{Int32}(ptr)
 
     # Thread-safe clone
-    arc2 = clone(arc1)
+    arc2 = RustCall.clone(arc1)
 
     # Can be used from different tasks
     @sync begin
@@ -324,8 +324,8 @@ if is_rust_helpers_available()
         end
     end
 
-    drop!(arc1)
-    drop!(arc2)
+    RustCall.drop!(arc1)
+    RustCall.drop!(arc2)
 end
 ```
 
@@ -344,7 +344,7 @@ pub extern "C" fn fast_add(a: i32, b: i32) -> i32 {
 """
 
 # Register function
-info = compile_and_register_rust_function("""
+info = RustCall.compile_and_register_rust_function("""
 #[no_mangle]
 pub extern "C" fn fast_add(a: i32, b: i32) -> i32 { a + b }
 """, "fast_add")
@@ -359,18 +359,18 @@ result = @rust_llvm fast_add(Int32(10), Int32(20))  # => 30
 using RustCall
 
 # Create optimization configuration
-config = OptimizationConfig(
+config = RustCall.OptimizationConfig(
     level=3,  # Optimization level 0-3
     enable_vectorization=true,
     inline_threshold=300
 )
 
 # Optimize module
-# optimize_module!(module, config)
+# RustCall.optimize_module!(module, config)
 
 # Convenience functions
-# optimize_for_speed!(module)  # Level 3, aggressive optimization
-# optimize_for_size!(module)   # Level 2, size optimization
+# RustCall.optimize_for_speed!(module)  # Level 3, aggressive optimization
+# RustCall.optimize_for_size!(module)   # Level 2, size optimization
 ```
 
 ## Performance Optimization
@@ -401,18 +401,18 @@ pub extern "C" fn compute(x: i32) -> i32 {
 
 ```julia
 # Check cache size
-size = get_cache_size()
+size = RustCall.get_cache_size()
 println("Cache size: $size bytes")
 
 # List cached libraries
-libs = list_cached_libraries()
+libs = RustCall.list_cached_libraries()
 println("Cached libraries: $libs")
 
 # Cleanup old cache (older than 30 days)
-cleanup_old_cache(30)
+RustCall.cleanup_old_cache(30)
 
 # Clear all cache
-clear_cache()
+RustCall.clear_cache()
 ```
 
 ### Running Benchmarks
@@ -442,11 +442,11 @@ result = @rust add(Int32(10), Int32(20))
 ```julia
 # Use Result type
 result = some_rust_function()
-if is_err(result)
+if RustCall.is_err(result)
     # Handle error
     return
 end
-value = unwrap(result)
+value = RustCall.unwrap(result)
 ```
 
 ### 3. Be Careful with Memory Management
@@ -454,11 +454,11 @@ value = unwrap(result)
 When using ownership types, always call `drop!` appropriately:
 
 ```julia
-box = RustBox{Int32}(ptr)
+box = RustCall.RustBox{Int32}(ptr)
 try
     # Use box
 finally
-    drop!(box)  # Always cleanup
+    RustCall.drop!(box)  # Always cleanup
 end
 ```
 
@@ -471,7 +471,7 @@ When using the same Rust code multiple times, caching is automatically leveraged
 If issues occur, try clearing the cache and recompiling:
 
 ```julia
-clear_cache()
+RustCall.clear_cache()
 ```
 
 ## Next Steps

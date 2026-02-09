@@ -59,116 +59,116 @@ include("test_regressions.jl")
 
     @testset "Type Mappings" begin
         # Test Rust to Julia type conversion
-        @test rusttype_to_julia(:i32) == Int32
-        @test rusttype_to_julia(:i64) == Int64
-        @test rusttype_to_julia(:f32) == Float32
-        @test rusttype_to_julia(:f64) == Float64
-        @test rusttype_to_julia(:bool) == Bool
-        @test rusttype_to_julia(:u8) == UInt8
-        @test rusttype_to_julia(:usize) == UInt
+        @test RustCall.rusttype_to_julia(:i32) == Int32
+        @test RustCall.rusttype_to_julia(:i64) == Int64
+        @test RustCall.rusttype_to_julia(:f32) == Float32
+        @test RustCall.rusttype_to_julia(:f64) == Float64
+        @test RustCall.rusttype_to_julia(:bool) == Bool
+        @test RustCall.rusttype_to_julia(:u8) == UInt8
+        @test RustCall.rusttype_to_julia(:usize) == UInt
 
         # Test Julia to Rust type conversion
-        @test juliatype_to_rust(Int32) == "i32"
-        @test juliatype_to_rust(Int64) == "i64"
-        @test juliatype_to_rust(Float32) == "f32"
-        @test juliatype_to_rust(Float64) == "f64"
-        @test juliatype_to_rust(Bool) == "bool"
+        @test RustCall.juliatype_to_rust(Int32) == "i32"
+        @test RustCall.juliatype_to_rust(Int64) == "i64"
+        @test RustCall.juliatype_to_rust(Float32) == "f32"
+        @test RustCall.juliatype_to_rust(Float64) == "f64"
+        @test RustCall.juliatype_to_rust(Bool) == "bool"
 
         # Test string form
-        @test rusttype_to_julia("i32") == Int32
-        @test rusttype_to_julia("*const i32") == Ptr{Int32}
-        @test rusttype_to_julia("*mut f64") == Ptr{Float64}
+        @test RustCall.rusttype_to_julia("i32") == Int32
+        @test RustCall.rusttype_to_julia("*const i32") == Ptr{Int32}
+        @test RustCall.rusttype_to_julia("*mut f64") == Ptr{Float64}
 
         # Test string types
-        @test rusttype_to_julia("String") == RustString
-        @test rusttype_to_julia("&str") == RustStr  # &str is a fat pointer (issue #89)
-        @test rusttype_to_julia("str") == Cstring    # bare str maps to Cstring
-        @test rusttype_to_julia("*const u8") == Cstring
-        @test rusttype_to_julia("*mut u8") == Ptr{UInt8}
-        @test juliatype_to_rust(String) == "*const u8"
-        @test juliatype_to_rust(Cstring) == "*const u8"
-        @test juliatype_to_rust(RustString) == "String"
-        @test juliatype_to_rust(RustStr) == "&str"   # RustStr round-trips to &str (issue #89)
+        @test RustCall.rusttype_to_julia("String") == RustCall.RustString
+        @test RustCall.rusttype_to_julia("&str") == RustCall.RustStr  # &str is a fat pointer (issue #89)
+        @test RustCall.rusttype_to_julia("str") == Cstring    # bare str maps to Cstring
+        @test RustCall.rusttype_to_julia("*const u8") == Cstring
+        @test RustCall.rusttype_to_julia("*mut u8") == Ptr{UInt8}
+        @test RustCall.juliatype_to_rust(String) == "*const u8"
+        @test RustCall.juliatype_to_rust(Cstring) == "*const u8"
+        @test RustCall.juliatype_to_rust(RustCall.RustString) == "String"
+        @test RustCall.juliatype_to_rust(RustCall.RustStr) == "&str"   # RustStr round-trips to &str (issue #89)
     end
 
     @testset "RustResult" begin
-        ok_result = RustResult{Int32, String}(true, Int32(42))
-        err_result = RustResult{Int32, String}(false, "error")
+        ok_result = RustCall.RustResult{Int32, String}(true, Int32(42))
+        err_result = RustCall.RustResult{Int32, String}(false, "error")
 
-        @test is_ok(ok_result)
-        @test !is_err(ok_result)
-        @test unwrap(ok_result) == 42
-        @test unwrap_or(ok_result, Int32(0)) == 42
+        @test RustCall.is_ok(ok_result)
+        @test !RustCall.is_err(ok_result)
+        @test RustCall.unwrap(ok_result) == 42
+        @test RustCall.unwrap_or(ok_result, Int32(0)) == 42
 
-        @test !is_ok(err_result)
-        @test is_err(err_result)
-        @test_throws ErrorException unwrap(err_result)
-        @test unwrap_or(err_result, Int32(0)) == 0
+        @test !RustCall.is_ok(err_result)
+        @test RustCall.is_err(err_result)
+        @test_throws ErrorException RustCall.unwrap(err_result)
+        @test RustCall.unwrap_or(err_result, Int32(0)) == 0
     end
 
     @testset "Error Handling" begin
         # Test RustError creation
-        err1 = RustError("test error")
+        err1 = RustCall.RustError("test error")
         @test err1.message == "test error"
         @test err1.code == 0
         @test err1.original_error === nothing
 
-        err2 = RustError("test error", Int32(42))
+        err2 = RustCall.RustError("test error", Int32(42))
         @test err2.message == "test error"
         @test err2.code == 42
         @test err2.original_error === nothing
 
-        err3 = RustError("test error", Int32(42), "original")
+        err3 = RustCall.RustError("test error", Int32(42), "original")
         @test err3.message == "test error"
         @test err3.code == 42
         @test err3.original_error == "original"
 
         # Test result_to_exception with Ok result
-        ok_result = RustResult{Int32, String}(true, Int32(42))
-        @test result_to_exception(ok_result) == 42
+        ok_result = RustCall.RustResult{Int32, String}(true, Int32(42))
+        @test RustCall.result_to_exception(ok_result) == 42
 
         # Test result_to_exception with Err result (String error → code -1, preserves original)
-        err_result = RustResult{Int32, String}(false, "division by zero")
-        @test_throws RustError result_to_exception(err_result)
+        err_result = RustCall.RustResult{Int32, String}(false, "division by zero")
+        @test_throws RustCall.RustError RustCall.result_to_exception(err_result)
         try
-            result_to_exception(err_result)
+            RustCall.result_to_exception(err_result)
         catch e
-            @test e isa RustError
+            @test e isa RustCall.RustError
             @test e.message == "division by zero"
             @test e.code == -1
             @test e.original_error == "division by zero"
         end
 
         # Test result_to_exception with Integer error type (uses error value as code)
-        int_err_result = RustResult{String, Int32}(false, Int32(42))
-        @test_throws RustError result_to_exception(int_err_result)
+        int_err_result = RustCall.RustResult{String, Int32}(false, Int32(42))
+        @test_throws RustCall.RustError RustCall.result_to_exception(int_err_result)
         try
-            result_to_exception(int_err_result)
+            RustCall.result_to_exception(int_err_result)
         catch e
-            @test e isa RustError
+            @test e isa RustCall.RustError
             @test e.message == "42"
             @test e.code == 42
             @test e.original_error == Int32(42)
         end
 
         # Test result_to_exception with explicit error code (preserves original)
-        err_result2 = RustResult{Int32, String}(false, "not found")
-        @test_throws RustError result_to_exception(err_result2, Int32(404))
+        err_result2 = RustCall.RustResult{Int32, String}(false, "not found")
+        @test_throws RustCall.RustError RustCall.result_to_exception(err_result2, Int32(404))
         try
-            result_to_exception(err_result2, Int32(404))
+            RustCall.result_to_exception(err_result2, Int32(404))
         catch e
-            @test e isa RustError
+            @test e isa RustCall.RustError
             @test e.message == "not found"
             @test e.code == 404
             @test e.original_error == "not found"
         end
 
         # Test unwrap_or_throw alias
-        @test unwrap_or_throw(ok_result) == 42
-        @test_throws RustError unwrap_or_throw(err_result)
+        @test RustCall.unwrap_or_throw(ok_result) == 42
+        @test_throws RustCall.RustError RustCall.unwrap_or_throw(err_result)
 
         # Test CompilationError creation
-        comp_err = CompilationError(
+        comp_err = RustCall.CompilationError(
             "Compilation failed",
             "error: expected `;`, found `}`",
             "fn test() {",
@@ -180,7 +180,7 @@ include("test_regressions.jl")
         @test comp_err.command == "rustc --emit=llvm-ir test.rs"
 
         # Test RuntimeError creation
-        runtime_err = RuntimeError("Function failed", "test_func", "stack trace here")
+        runtime_err = RustCall.RuntimeError("Function failed", "test_func", "stack trace here")
         @test runtime_err.message == "Function failed"
         @test runtime_err.function_name == "test_func"
         @test runtime_err.stack_trace == "stack trace here"
@@ -196,30 +196,30 @@ include("test_regressions.jl")
 
         error: aborting due to previous error
         """
-        formatted = format_rustc_error(test_stderr)
+        formatted = RustCall.format_rustc_error(test_stderr)
         @test occursin("error:", formatted)
         @test occursin("expected", formatted)
     end
 
     @testset "RustOption" begin
-        some_opt = RustOption{Int32}(true, Int32(42))
-        none_opt = RustOption{Int32}(false, nothing)
+        some_opt = RustCall.RustOption{Int32}(true, Int32(42))
+        none_opt = RustCall.RustOption{Int32}(false, nothing)
 
-        @test is_some(some_opt)
-        @test !is_none(some_opt)
-        @test unwrap(some_opt) == 42
-        @test unwrap_or(some_opt, Int32(0)) == 42
+        @test RustCall.is_some(some_opt)
+        @test !RustCall.is_none(some_opt)
+        @test RustCall.unwrap(some_opt) == 42
+        @test RustCall.unwrap_or(some_opt, Int32(0)) == 42
 
-        @test !is_some(none_opt)
-        @test is_none(none_opt)
-        @test_throws ErrorException unwrap(none_opt)
-        @test unwrap_or(none_opt, Int32(0)) == 0
+        @test !RustCall.is_some(none_opt)
+        @test RustCall.is_none(none_opt)
+        @test_throws ErrorException RustCall.unwrap(none_opt)
+        @test RustCall.unwrap_or(none_opt, Int32(0)) == 0
     end
 
     @testset "String Conversions" begin
         # Test julia_string_to_cstring
         s = "hello"
-        cs = julia_string_to_cstring(s)
+        cs = RustCall.julia_string_to_cstring(s)
         # cconvert returns the original string, unsafe_convert converts to Cstring
         @test cs isa String  # cconvert returns String, unsafe_convert is called at ccall time
 
@@ -228,12 +228,12 @@ include("test_regressions.jl")
         # The conversion will be tested in actual Rust function calls
 
         # Test julia_string_to_rust
-        rs = julia_string_to_rust("world")
-        @test rs isa RustStr
+        rs = RustCall.julia_string_to_rust("world")
+        @test rs isa RustCall.RustStr
         @test rs.len == 5
 
         # Test rust_str_to_julia
-        s3 = rust_str_to_julia(rs)
+        s3 = RustCall.rust_str_to_julia(rs)
         @test s3 == "world"
     end
 
@@ -400,12 +400,12 @@ include("test_regressions.jl")
         @testset "Phase 2: LLVM Integration" begin
             @testset "Optimization Configuration" begin
                 # Test default config
-                config = OptimizationConfig()
+                config = RustCall.OptimizationConfig()
                 @test config.level == 2
                 @test config.enable_vectorization == true
 
                 # Test custom config
-                custom_config = OptimizationConfig(
+                custom_config = RustCall.OptimizationConfig(
                     level=3,
                     enable_vectorization=false,
                     inline_threshold=100
@@ -438,8 +438,8 @@ include("test_regressions.jl")
                 stats_before = RustCall.get_optimization_stats(llvm_mod)
 
                 # Run optimization at level 2
-                config = OptimizationConfig(level=2)
-                optimize_module!(llvm_mod; config=config)
+                config = RustCall.OptimizationConfig(level=2)
+                RustCall.optimize_module!(llvm_mod; config=config)
 
                 # Count instructions after optimization
                 stats_after = RustCall.get_optimization_stats(llvm_mod)
@@ -557,7 +557,7 @@ include("test_regressions.jl")
             @testset "Extended Ownership Types" begin
                 # Only test with dummy pointers if Rust helpers library is NOT available
                 # (to avoid crash when drop! tries to free invalid pointer)
-                if !is_rust_helpers_available()
+                if !RustCall.is_rust_helpers_available()
                     # Use UInt to construct pointers (required on 64-bit systems)
                     addr1 = UInt(0x1000)
                     addr2 = UInt(0x2000)
@@ -566,52 +566,52 @@ include("test_regressions.jl")
                     addr5 = UInt(0x5000)
 
                     # Test RustBox
-                    box = RustBox{Int32}(Ptr{Cvoid}(addr1))
+                    box = RustCall.RustBox{Int32}(Ptr{Cvoid}(addr1))
                     @test box.ptr == Ptr{Cvoid}(addr1)
                     @test !box.dropped
-                    @test is_valid(box)
+                    @test RustCall.is_valid(box)
 
-                    drop!(box)
+                    RustCall.drop!(box)
                     @test box.dropped
-                    @test !is_valid(box)
+                    @test !RustCall.is_valid(box)
 
                     # Test RustRc
-                    rc = RustRc{Float64}(Ptr{Cvoid}(addr2))
+                    rc = RustCall.RustRc{Float64}(Ptr{Cvoid}(addr2))
                     @test rc.ptr == Ptr{Cvoid}(addr2)
                     @test !rc.dropped
 
-                    drop!(rc)
+                    RustCall.drop!(rc)
                     @test rc.dropped
-                    @test is_dropped(rc)
+                    @test RustCall.is_dropped(rc)
 
                     # Test RustArc
-                    arc = RustArc{String}(Ptr{Cvoid}(addr3))
+                    arc = RustCall.RustArc{String}(Ptr{Cvoid}(addr3))
                     @test arc.ptr == Ptr{Cvoid}(addr3)
                     @test !arc.dropped
 
-                    drop!(arc)
+                    RustCall.drop!(arc)
                     @test arc.dropped
 
                     # Test RustVec
-                    vec = RustVec{Int32}(Ptr{Cvoid}(addr4), UInt(10), UInt(20))
+                    vec = RustCall.RustVec{Int32}(Ptr{Cvoid}(addr4), UInt(10), UInt(20))
                     @test vec.ptr == Ptr{Cvoid}(addr4)
                     @test vec.len == 10
                     @test vec.cap == 20
                     @test length(vec) == 10
                     @test !vec.dropped
 
-                    drop!(vec)
+                    RustCall.drop!(vec)
                     @test vec.dropped
 
                     # Test RustSlice
-                    slice = RustSlice{Int32}(Ptr{Int32}(addr5), UInt(5))
+                    slice = RustCall.RustSlice{Int32}(Ptr{Int32}(addr5), UInt(5))
                     @test slice.ptr == Ptr{Int32}(addr5)
                     @test slice.len == 5
                     @test length(slice) == 5
                 else
                     # When Rust helpers library is available, test with real allocations
                     # These tests are covered in test_ownership.jl
-                    @test is_rust_helpers_available()
+                    @test RustCall.is_rust_helpers_available()
                 end
             end
         end
@@ -620,18 +620,18 @@ include("test_regressions.jl")
     end
 
     @testset "Temp directory cleanup (issue #88)" begin
-        if check_rustc_available()
+        if RustCall.check_rustc_available()
             @testset "Temp dir cleaned up on compilation error" begin
                 invalid_code = """
                 #[no_mangle]
                 pub extern "C" fn bad_syntax( -> i32 { 42 }
                 """
-                compiler = RustCompiler(debug_mode=false)
+                compiler = RustCall.RustCompiler(debug_mode=false)
 
                 # Track temp dirs created during compilation
                 pre_tmpdirs = Set(readdir(tempdir()))
 
-                @test_throws CompilationError compile_rust_to_shared_lib(invalid_code; compiler=compiler)
+                @test_throws RustCall.CompilationError RustCall.compile_rust_to_shared_lib(invalid_code; compiler=compiler)
 
                 # Verify no new temp dirs leaked (the try-finally should clean up)
                 post_tmpdirs = Set(readdir(tempdir()))
@@ -646,11 +646,11 @@ include("test_regressions.jl")
                 #[no_mangle]
                 pub extern "C" fn bad_syntax( -> i32 { 42 }
                 """
-                compiler = RustCompiler(debug_mode=false)
+                compiler = RustCall.RustCompiler(debug_mode=false)
 
                 pre_tmpdirs = Set(readdir(tempdir()))
 
-                @test_throws CompilationError compile_rust_to_llvm_ir(invalid_code; compiler=compiler)
+                @test_throws RustCall.CompilationError RustCall.compile_rust_to_llvm_ir(invalid_code; compiler=compiler)
 
                 post_tmpdirs = Set(readdir(tempdir()))
                 new_dirs = setdiff(post_tmpdirs, pre_tmpdirs)
@@ -664,9 +664,9 @@ include("test_regressions.jl")
                 pub extern "C" fn bad_syntax( -> i32 { 42 }
                 """
                 debug_dir = mktempdir()
-                compiler = RustCompiler(debug_mode=true, debug_dir=debug_dir)
+                compiler = RustCall.RustCompiler(debug_mode=true, debug_dir=debug_dir)
 
-                @test_throws CompilationError compile_rust_to_shared_lib(invalid_code; compiler=compiler)
+                @test_throws RustCall.CompilationError RustCall.compile_rust_to_shared_lib(invalid_code; compiler=compiler)
 
                 # Debug mode should keep the files (filename uses hash via _unique_source_name)
                 @test isdir(debug_dir)
@@ -682,7 +682,7 @@ include("test_regressions.jl")
     end
 
     @testset "Error Handling Enhancement" begin
-        if check_rustc_available()
+        if RustCall.check_rustc_available()
             @testset "CompilationError formatting" begin
                 # Test that CompilationError displays formatted output
                 # Use actually invalid Rust syntax (mismatched braces)
@@ -696,19 +696,19 @@ include("test_regressions.jl")
                 """
 
                 # This should throw a CompilationError
-                compiler = RustCompiler(debug_mode=false)
-                @test_throws CompilationError compile_rust_to_shared_lib(invalid_code; compiler=compiler)
+                compiler = RustCall.RustCompiler(debug_mode=false)
+                @test_throws RustCall.CompilationError RustCall.compile_rust_to_shared_lib(invalid_code; compiler=compiler)
             end
 
             @testset "Debug mode" begin
                 # Test debug mode configuration
-                debug_compiler = RustCompiler(debug_mode=true)
+                debug_compiler = RustCall.RustCompiler(debug_mode=true)
                 @test debug_compiler.debug_mode == true
                 @test debug_compiler.debug_dir === nothing
 
                 # Test debug mode with custom directory
                 debug_dir = mktempdir()
-                debug_compiler2 = RustCompiler(debug_mode=true, debug_dir=debug_dir)
+                debug_compiler2 = RustCall.RustCompiler(debug_mode=true, debug_dir=debug_dir)
                 @test debug_compiler2.debug_mode == true
                 @test debug_compiler2.debug_dir == debug_dir
 
@@ -728,8 +728,8 @@ include("test_regressions.jl")
                 }
                 """
 
-                compiler = RustCompiler(optimization_level=3, debug_mode=false)
-                @test_throws CompilationError compile_with_recovery(invalid_code, compiler; retry_count=1)
+                compiler = RustCall.RustCompiler(optimization_level=3, debug_mode=false)
+                @test_throws RustCall.CompilationError RustCall.compile_with_recovery(invalid_code, compiler; retry_count=1)
             end
 
             @testset "Valid code compilation" begin
@@ -741,8 +741,8 @@ include("test_regressions.jl")
                 }
                 """
 
-                compiler = RustCompiler(debug_mode=false)
-                lib_path = compile_rust_to_shared_lib(valid_code; compiler=compiler)
+                compiler = RustCall.RustCompiler(debug_mode=false)
+                lib_path = RustCall.compile_rust_to_shared_lib(valid_code; compiler=compiler)
                 @test isfile(lib_path)
 
                 # Clean up

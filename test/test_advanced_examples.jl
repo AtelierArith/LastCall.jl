@@ -3,7 +3,7 @@ using RustCall
 using Test
 
 @testset "Advanced Examples" begin
-    if !check_rustc_available()
+    if !RustCall.check_rustc_available()
         @warn "rustc not found, skipping advanced examples tests"
         return
     end

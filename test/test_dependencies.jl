@@ -8,7 +8,7 @@ using Test
 
     @testset "DependencySpec struct" begin
         # Test basic constructor
-        dep = DependencySpec("ndarray", version="0.15")
+        dep = RustCall.DependencySpec("ndarray", version="0.15")
         @test dep.name == "ndarray"
         @test dep.version == "0.15"
         @test isempty(dep.features)
@@ -16,17 +16,17 @@ using Test
         @test isnothing(dep.path)
 
         # Test with features
-        dep2 = DependencySpec("serde", version="1.0", features=["derive", "std"])
+        dep2 = RustCall.DependencySpec("serde", version="1.0", features=["derive", "std"])
         @test dep2.name == "serde"
         @test dep2.features == ["derive", "std"]
 
         # Test with git
-        dep3 = DependencySpec("my_crate", git="https://github.com/user/repo.git")
+        dep3 = RustCall.DependencySpec("my_crate", git="https://github.com/user/repo.git")
         @test dep3.git == "https://github.com/user/repo.git"
         @test isnothing(dep3.version)
 
         # Test with path
-        dep4 = DependencySpec("local_crate", path="../local_crate")
+        dep4 = RustCall.DependencySpec("local_crate", path="../local_crate")
         @test dep4.path == "../local_crate"
     end
 
@@ -111,7 +111,7 @@ using Test
         use serde::Serialize;
         """
 
-        deps = parse_dependencies_from_code(code)
+        deps = RustCall.parse_dependencies_from_code(code)
         @test length(deps) == 2
 
         # Find ndarray
@@ -134,7 +134,7 @@ using Test
         pub extern "C" fn test() -> i32 { 42 }
         """
 
-        deps = parse_dependencies_from_code(code)
+        deps = RustCall.parse_dependencies_from_code(code)
         @test length(deps) == 2
 
         dep_names = Set([d.name for d in deps])
@@ -147,7 +147,7 @@ using Test
         // cargo-deps: ndarray="0.15", serde={version="1.0", features=["derive"]}
         """
 
-        deps = parse_dependencies_from_code(code)
+        deps = RustCall.parse_dependencies_from_code(code)
         @test length(deps) == 2
 
         # Find serde with features
@@ -165,27 +165,27 @@ using Test
         //! ndarray = "0.15"
         //! ```
         """
-        @test has_dependencies(code1)
+        @test RustCall.has_dependencies(code1)
 
         # Code with cargo-deps line
         code2 = """
         // cargo-deps: ndarray="0.15"
         """
-        @test has_dependencies(code2)
+        @test RustCall.has_dependencies(code2)
 
         # Code without dependencies
         code3 = """
         #[no_mangle]
         pub extern "C" fn test() -> i32 { 42 }
         """
-        @test !has_dependencies(code3)
+        @test !RustCall.has_dependencies(code3)
     end
 
     @testset "merge_dependencies" begin
         deps = [
-            DependencySpec("serde", version="1.0", features=["derive"]),
-            DependencySpec("serde", version="1.0", features=["std"]),
-            DependencySpec("ndarray", version="0.15")
+            RustCall.DependencySpec("serde", version="1.0", features=["derive"]),
+            RustCall.DependencySpec("serde", version="1.0", features=["std"]),
+            RustCall.DependencySpec("ndarray", version="0.15")
         ]
 
         merged = RustCall.merge_dependencies(deps)

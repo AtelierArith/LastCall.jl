@@ -184,19 +184,20 @@ propertynames(p)  # => (:x, :y)
 Scan a Rust crate and extract `#[julia]` marked items.
 
 ```julia
-info = scan_crate("/path/to/crate")
+info = RustCall.scan_crate("/path/to/crate")
 
 println("Crate: ", info.name)
 println("Functions: ", length(info.julia_functions))
 println("Structs: ", length(info.julia_structs))
 ```
 
+
 ### `generate_bindings(path; kwargs...)`
 
 Generate Julia bindings for an external crate.
 
 ```julia
-bindings = generate_bindings("/path/to/crate",
+bindings = RustCall.generate_bindings("/path/to/crate",
     output_module_name = "MyBindings",
     build_release = true,
     cache_enabled = true
@@ -264,10 +265,10 @@ Compiled libraries are cached based on source code hash:
 
 ```julia
 # Clear the cache
-clear_cargo_cache()
+RustCall.clear_cargo_cache()
 
 # Check cache size
-get_cargo_cache_size()
+RustCall.get_cargo_cache_size()
 ```
 
 ## Supported Types
@@ -359,7 +360,7 @@ For package development, you can generate bindings to a file that will be precom
 using RustCall
 
 # Generate bindings and write to a file
-write_bindings_to_file(
+RustCall.write_bindings_to_file(
     "deps/my_rust_crate",              # Path to Rust crate
     "src/generated/MyRustBindings.jl", # Output file
     output_module_name = "MyRust",
@@ -386,7 +387,7 @@ write_bindings_to_file(
 2. **Generate bindings during development**:
    ```julia
    using RustCall
-   write_bindings_to_file(
+   RustCall.write_bindings_to_file(
        "deps/my_rust_crate",
        "src/generated/MyRustBindings.jl",
        output_module_name = "MyRust",
@@ -415,7 +416,7 @@ write_bindings_to_file(
 #### `write_bindings_to_file`
 
 ```julia
-write_bindings_to_file(
+RustCall.write_bindings_to_file(
     crate_path::String,
     output_path::String;
     output_module_name = nothing,
@@ -435,8 +436,8 @@ write_bindings_to_file(
 #### `emit_crate_module_code`
 
 ```julia
-emit_crate_module_code(
-    info::CrateInfo,
+RustCall.emit_crate_module_code(
+    info::RustCall.CrateInfo,
     lib_path::String;
     module_name = nothing,
     use_relative_path = false

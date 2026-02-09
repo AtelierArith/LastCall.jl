@@ -347,29 +347,29 @@ RustCall.jl provides Julia wrappers for Rust's `Result<T, E>` and `Option<T>` ty
 using RustCall
 
 # Result type
-ok_result = RustResult{Int32, String}(true, Int32(42))
-is_ok(ok_result)  # => true
-unwrap(ok_result)  # => 42
+ok_result = RustCall.RustResult{Int32, String}(true, Int32(42))
+RustCall.is_ok(ok_result)  # => true
+RustCall.unwrap(ok_result)  # => 42
 
-err_result = RustResult{Int32, String}(false, "error")
-is_err(err_result)  # => true
-unwrap_or(err_result, Int32(0))  # => 0
+err_result = RustCall.RustResult{Int32, String}(false, "error")
+RustCall.is_err(err_result)  # => true
+RustCall.unwrap_or(err_result, Int32(0))  # => 0
 
 # Convert Result to exception
 try
-    result_to_exception(err_result)
+    RustCall.result_to_exception(err_result)
 catch e
-    println(e isa RustError)  # => true
+    println(e isa RustCall.RustError)  # => true
 end
 
 # Option type
-some_opt = RustOption{Int32}(true, Int32(42))
-is_some(some_opt)  # => true
-unwrap(some_opt)   # => 42
+some_opt = RustCall.RustOption{Int32}(true, Int32(42))
+RustCall.is_some(some_opt)  # => true
+RustCall.unwrap(some_opt)   # => 42
 
-none_opt = RustOption{Int32}(false, nothing)
-is_none(none_opt)  # => true
-unwrap_or(none_opt, Int32(0))  # => 0
+none_opt = RustCall.RustOption{Int32}(false, nothing)
+RustCall.is_none(none_opt)  # => true
+RustCall.unwrap_or(none_opt, Int32(0))  # => 0
 ```
 
 ## Ownership Types (Phase 2)
@@ -380,33 +380,33 @@ RustCall.jl provides Julia wrappers for Rust's ownership types. These require th
 using RustCall
 
 # Check if Rust helpers library is available
-if is_rust_helpers_available()
+if RustCall.is_rust_helpers_available()
     # RustBox - heap-allocated value (single ownership)
-    box = RustBox(Int32(42))
-    @test is_valid(box)
-    drop!(box)  # Explicitly drop
-    @test is_dropped(box)
+    box = RustCall.RustBox(Int32(42))
+    @test RustCall.is_valid(box)
+    RustCall.drop!(box)  # Explicitly drop
+    @test RustCall.is_dropped(box)
 
     # RustRc - reference counting (single-threaded)
-    rc1 = RustRc(Int32(100))
-    rc2 = clone(rc1)  # Increment reference count
-    drop!(rc1)  # Still valid because rc2 holds a reference
-    @test is_valid(rc2)
-    drop!(rc2)
+    rc1 = RustCall.RustRc(Int32(100))
+    rc2 = RustCall.clone(rc1)  # Increment reference count
+    RustCall.drop!(rc1)  # Still valid because rc2 holds a reference
+    @test RustCall.is_valid(rc2)
+    RustCall.drop!(rc2)
 
     # RustArc - atomic reference counting (thread-safe)
-    arc1 = RustArc(Int32(200))
-    arc2 = clone(arc1)  # Thread-safe clone
-    drop!(arc1)
-    @test is_valid(arc2)
-    drop!(arc2)
+    arc1 = RustCall.RustArc(Int32(200))
+    arc2 = RustCall.clone(arc1)  # Thread-safe clone
+    RustCall.drop!(arc1)
+    @test RustCall.is_valid(arc2)
+    RustCall.drop!(arc2)
 
     # RustVec - growable array
-    vec = RustVec{Int32}(ptr, len, cap)
+    vec = RustCall.RustVec{Int32}(ptr, len, cap)
     @test length(vec) == len
 
     # RustSlice - slice view
-    slice = RustSlice{Int32}(ptr, len)
+    slice = RustCall.RustSlice{Int32}(ptr, len)
     @test length(slice) == len
 end
 ```
@@ -421,7 +421,7 @@ RustCall.jl provides full support for array operations on `RustVec` and `RustSli
 using RustCall
 
 # Indexing (1-based, like Julia arrays)
-vec = RustVec{Int32}(ptr, 10, 20)
+vec = RustCall.RustVec{Int32}(ptr, 10, 20)
 value = vec[1]      # Get first element
 vec[1] = 42         # Set first element
 
@@ -442,15 +442,15 @@ julia_vec = Vector(vec)  # or collect(vec)
 println(julia_vec)  # => [1, 2, 3, ...]
 
 # RustSlice - read-only view
-slice = RustSlice{Int32}(ptr, 5)
+slice = RustCall.RustSlice{Int32}(ptr, 5)
 value = slice[1]    # Get element
 for x in slice
     println(x)
 end
 
 # Iterator traits
-@test Base.IteratorSize(RustVec{Int32}) == Base.HasLength()
-@test Base.eltype(RustVec{Int32}) == Int32
+@test Base.IteratorSize(RustCall.RustVec{Int32}) == Base.HasLength()
+@test Base.eltype(RustCall.RustVec{Int32}) == Int32
 ```
 
 **Note**: Creating `RustVec` from Julia `Vector` requires the Rust helpers library. Use `create_rust_vec()` to convert Julia arrays to RustVec.
@@ -471,7 +471,7 @@ pub extern "C" fn add(a: i32, b: i32) -> i32 {
 """
 
 # Register for LLVM integration
-info = compile_and_register_rust_function("""
+info = RustCall.compile_and_register_rust_function("""
 #[no_mangle]
 pub extern "C" fn add(a: i32, b: i32) -> i32 { a + b }
 """, "add")
@@ -496,7 +496,7 @@ pub extern "C" fn add(a: i32, b: i32) -> i32 {
 """
 
 wrapped_code = RustCall.wrap_rust_code(rust_code)
-compiler = get_default_compiler()
+compiler = RustCall.get_default_compiler()
 ir_path = RustCall.compile_rust_to_llvm_ir(wrapped_code; compiler=compiler)
 
 # Load the LLVM IR module
@@ -504,18 +504,18 @@ rust_mod = RustCall.load_llvm_ir(ir_path; source_code=wrapped_code)
 llvm_mod = rust_mod.mod  # Get the LLVM.Module
 
 # Create optimization config
-config = OptimizationConfig(
+config = RustCall.OptimizationConfig(
     level=3,  # Optimization level 0-3
     enable_vectorization=true,
     inline_threshold=300
 )
 
 # Optimize the module
-optimize_module!(llvm_mod; config=config)
+RustCall.optimize_module!(llvm_mod; config=config)
 
 # Convenience functions
-optimize_for_speed!(llvm_mod)  # Level 3, aggressive optimizations
-optimize_for_size!(llvm_mod)   # Level 2, size optimizations
+RustCall.optimize_for_speed!(llvm_mod)  # Level 3, aggressive optimizations
+RustCall.optimize_for_size!(llvm_mod)   # Level 2, size optimizations
 ```
 
 ## External Library Integration (Phase 3)
@@ -720,10 +720,10 @@ pub extern "C" fn test() -> i32 { 42 }
 """
 
 # Cache management
-clear_cache()  # Clear all cached libraries
-get_cache_size()  # Get cache size in bytes
-list_cached_libraries()  # List all cached library keys
-cleanup_old_cache(30)  # Remove entries older than 30 days
+RustCall.clear_cache()  # Clear all cached libraries
+RustCall.get_cache_size()  # Get cache size in bytes
+RustCall.list_cached_libraries()  # List all cached library keys
+RustCall.cleanup_old_cache(30)  # Remove entries older than 30 days
 ```
 
 ## Architecture

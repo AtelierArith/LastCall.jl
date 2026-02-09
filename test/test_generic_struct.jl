@@ -3,7 +3,7 @@ using RustCall
 using Test
 
 @testset "Generic Struct Test" begin
-    if !check_rustc_available()
+    if !RustCall.check_rustc_available()
         @warn "rustc not found, skipping generic struct tests"
         return
     end

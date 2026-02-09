@@ -17,7 +17,7 @@ using Test
         error: aborting due to previous error
         """
 
-        formatted = format_rustc_error(stderr)
+        formatted = RustCall.format_rustc_error(stderr)
         @test occursin("❌", formatted)
         @test occursin("error:", formatted)
         @test occursin("expected", formatted)
@@ -31,7 +31,7 @@ using Test
            |         ^
         """
 
-        formatted_warning = format_rustc_error(stderr_warning)
+        formatted_warning = RustCall.format_rustc_error(stderr_warning)
         @test occursin("⚠️", formatted_warning)
         @test occursin("warning:", formatted_warning)
     end
@@ -46,7 +46,7 @@ using Test
            |  ^
         """
 
-        line_numbers = _extract_error_line_numbers(stderr)
+        line_numbers = RustCall._extract_error_line_numbers(stderr)
         @test 2 in line_numbers
     end
 
@@ -62,7 +62,7 @@ using Test
         help: add `;` here
         """
 
-        suggestions = _extract_suggestions(stderr)
+        suggestions = RustCall._extract_suggestions(stderr)
         @test !isempty(suggestions)
         # Check if suggestions contain help message or semicolon-related suggestion
         @test any(s -> occursin("semicolon", lowercase(s)) || occursin("add", lowercase(s)) || occursin(";", s), suggestions)
@@ -72,26 +72,26 @@ using Test
         # Test missing semicolon
         stderr = "error: expected `;`, found `}`"
         source = "fn test() { let x = 42 }"
-        suggestions = suggest_fix_for_error(stderr, source)
+        suggestions = RustCall.suggest_fix_for_error(stderr, source)
         @test !isempty(suggestions)
         @test any(s -> occursin("semicolon", lowercase(s)), suggestions)
 
         # Test mismatched braces
         stderr_brace = "error: expected `}`, found `EOF`"
         source_brace = "fn test() { let x = { 42"
-        suggestions_brace = suggest_fix_for_error(stderr_brace, source_brace)
+        suggestions_brace = RustCall.suggest_fix_for_error(stderr_brace, source_brace)
         @test !isempty(suggestions_brace)
         @test any(s -> occursin("brace", lowercase(s)), suggestions_brace)
 
         # Test missing #[no_mangle]
         stderr_ffi = "error: cannot find function `test`"
         source_ffi = "pub extern \"C\" fn test() -> i32 { 42 }"
-        suggestions_ffi = suggest_fix_for_error(stderr_ffi, source_ffi)
+        suggestions_ffi = RustCall.suggest_fix_for_error(stderr_ffi, source_ffi)
         @test any(s -> occursin("no_mangle", lowercase(s)), suggestions_ffi)
     end
 
     @testset "CompilationError display" begin
-        if check_rustc_available()
+        if RustCall.check_rustc_available()
             # Test that CompilationError shows formatted output
             invalid_code = """
             #[no_mangle]
@@ -102,15 +102,15 @@ using Test
             }
             """
 
-            compiler = RustCompiler(debug_mode=false)
-            @test_throws CompilationError compile_rust_to_shared_lib(invalid_code; compiler=compiler)
+            compiler = RustCall.RustCompiler(debug_mode=false)
+            @test_throws RustCall.CompilationError RustCall.compile_rust_to_shared_lib(invalid_code; compiler=compiler)
         else
             @warn "rustc not available, skipping CompilationError display test"
         end
     end
 
     @testset "Debug mode information" begin
-        if check_rustc_available()
+        if RustCall.check_rustc_available()
             # Test that debug mode keeps files and provides info
             valid_code = """
             #[no_mangle]
@@ -118,10 +118,10 @@ using Test
             """
 
             debug_dir = mktempdir()
-            compiler = RustCompiler(debug_mode=true, debug_dir=debug_dir)
+            compiler = RustCall.RustCompiler(debug_mode=true, debug_dir=debug_dir)
 
             try
-                lib_path = compile_rust_to_shared_lib(valid_code; compiler=compiler)
+                lib_path = RustCall.compile_rust_to_shared_lib(valid_code; compiler=compiler)
                 @test isfile(lib_path)
 
                 # Check that debug directory exists and has files
@@ -136,7 +136,7 @@ using Test
     end
 
     @testset "RuntimeError display" begin
-        error = RuntimeError("Function failed", "test_func", "at test.rs:1:5")
+        error = RustCall.RuntimeError("Function failed", "test_func", "at test.rs:1:5")
         error_str = sprint(showerror, error)
 
         @test occursin("RuntimeError", error_str)
@@ -147,14 +147,14 @@ using Test
 
     @testset "Error message formatting edge cases" begin
         # Test empty stderr
-        formatted = format_rustc_error("")
+        formatted = RustCall.format_rustc_error("")
         @test isempty(formatted) || isempty(strip(formatted))
 
         # Test stderr with only warnings
         stderr_warning_only = """
         warning: unused variable `x`
         """
-        formatted = format_rustc_error(stderr_warning_only)
+        formatted = RustCall.format_rustc_error(stderr_warning_only)
         @test occursin("warning", formatted)
 
         # Test multiple errors
@@ -162,7 +162,7 @@ using Test
         error: first error
         error: second error
         """
-        formatted = format_rustc_error(stderr_multiple)
+        formatted = RustCall.format_rustc_error(stderr_multiple)
         @test occursin("Summary", formatted) || count("error:", lowercase(formatted)) >= 2
     end
 end

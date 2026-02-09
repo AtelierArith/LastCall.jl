@@ -5,7 +5,7 @@ using Test
 
 @testset "Compilation Caching" begin
     # Clear cache before testing
-    clear_cache()
+    RustCall.clear_cache()
 
     @testset "Cache Directory Management" begin
         cache_dir = RustCall.get_cache_dir()
@@ -89,11 +89,11 @@ using Test
 
     @testset "Cache Operations" begin
         # Test cache size
-        initial_size = get_cache_size()
+        initial_size = RustCall.get_cache_size()
         @test initial_size >= 0
 
         # Test listing cached libraries (should be empty initially)
-        cached_libs = list_cached_libraries()
+        cached_libs = RustCall.list_cached_libraries()
         @test isa(cached_libs, Vector{String})
     end
 
@@ -195,7 +195,7 @@ using Test
     if RustCall.check_rustc_available()
         @testset "Cache Hit/Miss" begin
             # Clear cache
-            clear_cache()
+            RustCall.clear_cache()
 
             # First compilation (cache miss)
             rust"""
@@ -210,7 +210,7 @@ using Test
             @test result1 == 30
 
             # Check that cache was created
-            cached_libs = list_cached_libraries()
+            cached_libs = RustCall.list_cached_libraries()
             @test length(cached_libs) > 0
 
             # Clear in-memory cache
@@ -256,11 +256,11 @@ using Test
 
         @testset "Cache Cleanup" begin
             # Test cleanup function exists and runs without error
-            removed_count = cleanup_old_cache(0)  # Remove all files older than 0 days
+            removed_count = RustCall.cleanup_old_cache(0)  # Remove all files older than 0 days
             @test removed_count >= 0
 
             # Test cache size
-            cache_size = get_cache_size()
+            cache_size = RustCall.get_cache_size()
             @test cache_size >= 0
         end
 
@@ -271,15 +271,15 @@ using Test
             pub extern "C" fn clear_test() -> i32 { 999 }
             """
 
-            cached_before = list_cached_libraries()
+            cached_before = RustCall.list_cached_libraries()
             @test length(cached_before) > 0
-            cache_size_before = get_cache_size()
+            cache_size_before = RustCall.get_cache_size()
 
             # Clear cache
-            clear_cache()
+            RustCall.clear_cache()
 
-            cached_after = list_cached_libraries()
-            cache_size_after = get_cache_size()
+            cached_after = RustCall.list_cached_libraries()
+            cache_size_after = RustCall.get_cache_size()
 
             # On Windows, DLL files may be locked and cannot be deleted immediately
             # if they are currently loaded by Julia. Allow some files to remain.

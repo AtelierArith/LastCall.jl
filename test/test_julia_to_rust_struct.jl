@@ -3,7 +3,7 @@ using RustCall
 using Test
 
 @testset "Julia to Rust Struct" begin
-    if !check_rustc_available()
+    if !RustCall.check_rustc_available()
         @warn "rustc not found, skipping julia_to_rust_struct tests"
         return
     end
