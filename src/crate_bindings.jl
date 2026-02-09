@@ -733,11 +733,15 @@ function _generate_crate_struct_wrapper(info::RustStructInfo)
             function $struct_name(ptr::Ptr{Cvoid})
                 obj = new(ptr)
                 finalizer(obj) do x
-                    if getfield(x, :ptr) != C_NULL
-                        free_fn = $(struct_name_str * "_free")
-                        func_ptr = _get_func_ptr(free_fn)
-                        ccall(func_ptr, Cvoid, (Ptr{Cvoid},), getfield(x, :ptr))
-                        setfield!(x, :ptr, C_NULL)
+                    try
+                        if getfield(x, :ptr) != C_NULL
+                            free_fn = $(struct_name_str * "_free")
+                            func_ptr = _get_func_ptr(free_fn)
+                            ccall(func_ptr, Cvoid, (Ptr{Cvoid},), getfield(x, :ptr))
+                            setfield!(x, :ptr, C_NULL)
+                        end
+                    catch e
+                        @warn "Failed to free $($(struct_name_str))" exception=e maxlog=10
                     end
                 end
                 return obj
@@ -1498,11 +1502,15 @@ function _emit_struct_code(info::RustStructInfo)
     push!(lines, "    function $struct_name(ptr::Ptr{Cvoid})")
     push!(lines, "        obj = new(ptr)")
     push!(lines, "        finalizer(obj) do x")
-    push!(lines, "            if getfield(x, :ptr) != C_NULL")
-    push!(lines, "                free_fn = \"$(struct_name)_free\"")
-    push!(lines, "                func_ptr = _get_func_ptr(free_fn)")
-    push!(lines, "                ccall(func_ptr, Cvoid, (Ptr{Cvoid},), getfield(x, :ptr))")
-    push!(lines, "                setfield!(x, :ptr, C_NULL)")
+    push!(lines, "            try")
+    push!(lines, "                if getfield(x, :ptr) != C_NULL")
+    push!(lines, "                    free_fn = \"$(struct_name)_free\"")
+    push!(lines, "                    func_ptr = _get_func_ptr(free_fn)")
+    push!(lines, "                    ccall(func_ptr, Cvoid, (Ptr{Cvoid},), getfield(x, :ptr))")
+    push!(lines, "                    setfield!(x, :ptr, C_NULL)")
+    push!(lines, "                end")
+    push!(lines, "            catch e")
+    push!(lines, "                @warn \"Failed to free $(struct_name)\" exception=e maxlog=10")
     push!(lines, "            end")
     push!(lines, "        end")
     push!(lines, "        return obj")
