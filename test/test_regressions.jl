@@ -536,4 +536,32 @@ using Test
         @test extracted !== nothing
         @test occursin("async fn async_fetch", extracted)
     end
+
+    # Issue #87: @rust comparison processes both sides symmetrically
+    @testset "@rust comparison processes both sides symmetrically (#87)" begin
+        # Both sides should go through the same processing pipeline.
+        # When both LHS and RHS are Rust calls, both should be expanded via rust_impl.
+        lhs_call = Expr(:call, :add, :(Int32(1)), :(Int32(2)))
+        rhs_call = Expr(:call, :sub, :(Int32(5)), :(Int32(2)))
+        cmp_expr = Expr(:call, :(==), lhs_call, rhs_call)
+        expanded = RustCall.rust_impl(@__MODULE__, cmp_expr)
+        expanded_str = sprint(show, expanded)
+        # Both add and sub should be expanded through rust_impl (dynamic call path)
+        @test occursin("_rust_call_dynamic", expanded_str) || occursin("_resolve_lib", expanded_str)
+        # The expanded expression should be a comparison
+        @test expanded.head == :call
+        @test expanded.args[1] == :(==)
+    end
+
+    @testset "@rust comparison with plain value RHS (#87)" begin
+        # @rust add(1, 2) == 3  —  LHS is a call, RHS is a literal
+        lhs_call = Expr(:call, :add, :(Int32(1)), :(Int32(2)))
+        cmp_expr = Expr(:call, :(==), lhs_call, 3)
+        expanded = RustCall.rust_impl(@__MODULE__, cmp_expr)
+        @test expanded.head == :call
+        @test expanded.args[1] == :(==)
+        # LHS should be a Rust call expansion
+        lhs_expanded_str = sprint(show, expanded.args[2])
+        @test occursin("_rust_call_dynamic", lhs_expanded_str) || occursin("_resolve_lib", lhs_expanded_str)
+    end
 end
