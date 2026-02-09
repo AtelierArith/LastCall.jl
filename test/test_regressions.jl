@@ -461,4 +461,79 @@ using Test
         @test extracted !== nothing
         @test occursin("let result = f(5)", extracted)
     end
+
+    # Issue #86: regex patterns match async/unsafe/const fn modifiers
+    @testset "generic function detection matches async fn (#86)" begin
+        code = """
+        pub async fn fetch_data<T>(url: T) -> T {
+            url
+        }
+        """
+        empty!(RustCall.GENERIC_FUNCTION_REGISTRY)
+        RustCall._detect_and_register_generic_functions(code, "test_async")
+        @test haskey(RustCall.GENERIC_FUNCTION_REGISTRY, "fetch_data")
+        empty!(RustCall.GENERIC_FUNCTION_REGISTRY)
+    end
+
+    @testset "generic function detection matches unsafe fn (#86)" begin
+        code = """
+        pub unsafe fn raw_op<T>(ptr: *const T) -> T {
+            *ptr
+        }
+        """
+        empty!(RustCall.GENERIC_FUNCTION_REGISTRY)
+        RustCall._detect_and_register_generic_functions(code, "test_unsafe")
+        @test haskey(RustCall.GENERIC_FUNCTION_REGISTRY, "raw_op")
+        empty!(RustCall.GENERIC_FUNCTION_REGISTRY)
+    end
+
+    @testset "generic function detection matches const fn (#86)" begin
+        code = """
+        pub const fn const_identity<T>(x: T) -> T {
+            x
+        }
+        """
+        empty!(RustCall.GENERIC_FUNCTION_REGISTRY)
+        RustCall._detect_and_register_generic_functions(code, "test_const")
+        @test haskey(RustCall.GENERIC_FUNCTION_REGISTRY, "const_identity")
+        empty!(RustCall.GENERIC_FUNCTION_REGISTRY)
+    end
+
+    @testset "return type parsing matches unsafe fn (#86)" begin
+        code = """
+        #[no_mangle]
+        pub unsafe extern "C" fn unsafe_add(a: i32, b: i32) -> i32 {
+            a + b
+        }
+        """
+        ret_type = RustCall._parse_function_return_type(code, "unsafe_add")
+        @test ret_type == Int32
+    end
+
+    @testset "function signature registration matches unsafe fn (#86)" begin
+        code = """
+        #[no_mangle]
+        pub unsafe extern "C" fn unsafe_mul(a: i32, b: i32) -> i32 {
+            a * b
+        }
+        """
+        empty!(RustCall.FUNCTION_RETURN_TYPES)
+        empty!(RustCall.FUNCTION_RETURN_TYPES_BY_LIB)
+        RustCall._register_function_signatures(code, "test_unsafe_lib")
+        @test haskey(RustCall.FUNCTION_RETURN_TYPES, "unsafe_mul")
+        @test RustCall.FUNCTION_RETURN_TYPES["unsafe_mul"] == Int32
+        empty!(RustCall.FUNCTION_RETURN_TYPES)
+        empty!(RustCall.FUNCTION_RETURN_TYPES_BY_LIB)
+    end
+
+    @testset "extract_function_code captures async/unsafe/const fn prefix (#86)" begin
+        code = """
+        pub async fn async_fetch() {
+            let x = 1;
+        }
+        """
+        extracted = RustCall.extract_function_code(code, "async_fetch")
+        @test extracted !== nothing
+        @test occursin("async fn async_fetch", extracted)
+    end
 end

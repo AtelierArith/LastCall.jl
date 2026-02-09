@@ -547,8 +547,8 @@ end
 Extract the full code for a function from Rust source code.
 """
 function extract_function_code(code::String, func_name::String)
-    # Find function start - improved to handle nested brackets
-    func_start_pattern = Regex("fn\\s+$func_name.*?\\{", "s")
+    # Find function start - handle async/unsafe/const/pub/extern modifiers
+    func_start_pattern = Regex("(?:(?:pub\\s+)?(?:async\\s+|unsafe\\s+|const\\s+)*)?(?:extern\\s+\"C\"\\s+)?fn\\s+$func_name.*?\\{", "s")
     m = match(func_start_pattern, code)
 
     if m === nothing
@@ -692,7 +692,7 @@ end
 Detect generic functions in Rust code and register them for monomorphization.
 """
 function _detect_and_register_generic_functions(code::String, lib_name::String)
-    func_pattern = r"(?:#\[no_mangle\])?\s*(?:pub\s+)?(?:extern\s+\"C\"\s+)?fn\s+(\w+)\s*<(.+?)>\s*\("
+    func_pattern = r"(?:#\[no_mangle\])?\s*(?:pub\s+)?(?:(?:async|unsafe|const)\s+)*(?:extern\s+\"C\"\s+)?fn\s+(\w+)\s*<(.+?)>\s*\("
 
     for m in eachmatch(func_pattern, code)
         func_name = String(m.captures[1])
@@ -746,7 +746,7 @@ Returns the Julia type corresponding to the Rust return type, or nothing if not 
 function _parse_function_return_type(code::String, func_name::String)
     # Pattern to match: pub extern "C" fn func_name(...) -> return_type {
     # or: #[no_mangle] pub extern "C" fn func_name(...) -> return_type {
-    pattern = Regex("(?:#\\[no_mangle\\]\\s*)?(?:pub\\s+)?(?:extern\\s+\"C\"\\s+)?fn\\s+$func_name\\s*\\([^)]*\\)\\s*->\\s*([\\w:<>,\\s\\[\\]]+)", "s")
+    pattern = Regex("(?:#\\[no_mangle\\]\\s*)?(?:pub\\s+)?(?:(?:async|unsafe|const)\\s+)*(?:extern\\s+\"C\"\\s+)?fn\\s+$func_name\\s*\\([^)]*\\)\\s*->\\s*([\\w:<>,\\s\\[\\]]+)", "s")
     m = match(pattern, code)
 
     if m === nothing
@@ -787,7 +787,7 @@ function _register_function_signatures(code::String, lib_name::String)
     # Pattern to match function definitions: pub extern "C" fn name(...) -> type {
     # or: #[no_mangle] pub extern "C" fn name(...) -> type {
     # Use a simpler pattern that matches the function signature more reliably
-    pattern = Regex("(?:#\\[no_mangle\\]\\s*)?(?:pub\\s+)?(?:extern\\s+\"C\"\\s+)?fn\\s+(\\w+)\\s*\\([^)]*\\)(?:\\s*->\\s*([\\w:<>,\\s\\[\\]]+))?", "s")
+    pattern = Regex("(?:#\\[no_mangle\\]\\s*)?(?:pub\\s+)?(?:(?:async|unsafe|const)\\s+)*(?:extern\\s+\"C\"\\s+)?fn\\s+(\\w+)\\s*\\([^)]*\\)(?:\\s*->\\s*([\\w:<>,\\s\\[\\]]+))?", "s")
 
     for m in eachmatch(pattern, code)
         func_name = String(m.captures[1])
