@@ -142,7 +142,7 @@ using Test
 
     @testset "Qualified @rust calls resolve libraries consistently" begin
         qualified_call = Expr(:call, Expr(:(::), :fake_lib, :fake_fn), :(Int32(1)))
-        expanded = RustCall.rust_impl(@__MODULE__, qualified_call, LineNumberNode(1))
+        expanded = RustCall.rust_impl(@__MODULE__, qualified_call)
         expanded_str = sprint(show, expanded)
         @test occursin("_rust_call_from_lib", expanded_str)
         @test occursin("_resolve_lib", expanded_str)
@@ -362,5 +362,17 @@ using Test
         # _convert_args_for_rust was a no-op function that returned args unchanged.
         # Verify it has been removed from the module.
         @test !isdefined(RustCall, :_convert_args_for_rust)
+    end
+
+    @testset "Unused source parameter removed from macro expansion (#100)" begin
+        # rust_impl and friends no longer accept a source parameter.
+        # Verify 2-arg rust_impl works and 3-arg (with source) errors.
+        call_expr = Expr(:call, :fake_fn, :(Int32(1)))
+        expanded = RustCall.rust_impl(@__MODULE__, call_expr)
+        expanded_str = sprint(show, expanded)
+        @test occursin("_rust_call_dynamic", expanded_str)
+
+        # The old 3-arg signature should no longer exist
+        @test_throws MethodError RustCall.rust_impl(@__MODULE__, call_expr, LineNumberNode(1))
     end
 end

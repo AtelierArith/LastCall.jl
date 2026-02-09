@@ -23,7 +23,7 @@ Call a Rust function from Julia.
 ```
 """
 macro rust(expr)
-    return rust_impl(__module__, expr, __source__)
+    return rust_impl(__module__, expr)
 end
 
 const RUST_COMPARISON_OPS = Set{Symbol}([
@@ -39,11 +39,11 @@ const RUST_COMPARISON_OPS = Set{Symbol}([
 ])
 
 """
-    rust_impl(mod, expr, source)
+    rust_impl(mod, expr)
 
 Implementation of the @rust macro.
 """
-function rust_impl(mod, expr, source)
+function rust_impl(mod, expr)
     if isexpr(expr, :call)
         op = expr.args[1]
         if op isa Symbol && op in RUST_COMPARISON_OPS
@@ -52,7 +52,7 @@ function rust_impl(mod, expr, source)
             end
             lhs = expr.args[2]
             rhs = expr.args[3]
-            rust_expr = rust_impl(mod, lhs, source)
+            rust_expr = rust_impl(mod, lhs)
             return Expr(:call, op, rust_expr, esc(rhs))
         end
     end
@@ -68,19 +68,19 @@ function rust_impl(mod, expr, source)
         qualified = _parse_qualified_call(lhs)
         if qualified !== nothing
             lib_name, call_expr = qualified
-            return rust_impl_qualified(mod, lib_name, call_expr, ret_type, source)
+            return rust_impl_qualified(mod, lib_name, call_expr, ret_type)
         end
 
         # Regular typed call
         if isexpr(lhs, :call)
-            return rust_impl_with_type(mod, lhs, ret_type, source)
+            return rust_impl_with_type(mod, lhs, ret_type)
         end
 
         # Qualified call without return type: @rust lib::func(args...)
         qualified = _parse_qualified_call(expr)
         if qualified !== nothing
             lib_name, call_expr = qualified
-            return rust_impl_qualified(mod, lib_name, call_expr, nothing, source)
+            return rust_impl_qualified(mod, lib_name, call_expr, nothing)
         end
 
         error("Expected function call before ::Type, got: $lhs")
@@ -90,23 +90,23 @@ function rust_impl(mod, expr, source)
     qualified = _parse_qualified_call(expr)
     if qualified !== nothing
         lib_name, call_expr = qualified
-        return rust_impl_qualified(mod, lib_name, call_expr, nothing, source)
+        return rust_impl_qualified(mod, lib_name, call_expr, nothing)
     end
 
     # Handle simple function call: @rust func(args...)
     if isexpr(expr, :call)
-        return rust_impl_call(mod, expr, nothing, source)
+        return rust_impl_call(mod, expr, nothing)
     end
 
     error("Invalid @rust syntax: $expr")
 end
 
 """
-    rust_impl_call(mod, expr, ret_type, source)
+    rust_impl_call(mod, expr, ret_type)
 
 Handle a simple function call.
 """
-function rust_impl_call(mod, expr, ret_type, source)
+function rust_impl_call(mod, expr, ret_type)
     func_name = expr.args[1]
     args = expr.args[2:end]
 
@@ -158,24 +158,24 @@ function _resolve_lib(mod::Module, lib_name::String)
 end
 
 """
-    rust_impl_with_type(mod, call_expr, ret_type, source)
+    rust_impl_with_type(mod, call_expr, ret_type)
 
 Handle a function call with explicit return type.
 """
-function rust_impl_with_type(mod, call_expr, ret_type, source)
+function rust_impl_with_type(mod, call_expr, ret_type)
     if !isexpr(call_expr, :call)
         error("Expected function call before ::Type, got: $call_expr")
     end
 
-    return rust_impl_call(mod, call_expr, ret_type, source)
+    return rust_impl_call(mod, call_expr, ret_type)
 end
 
 """
-    rust_impl_qualified(mod, lib_name, call_expr, ret_type, source)
+    rust_impl_qualified(mod, lib_name, call_expr, ret_type)
 
 Handle a library-qualified function call: lib::func(args...)
 """
-function rust_impl_qualified(mod, lib_name, call_expr, ret_type, source)
+function rust_impl_qualified(mod, lib_name, call_expr, ret_type)
     func_name = call_expr.args[1]
     args = call_expr.args[2:end]
     lib_name_str = string(lib_name)
