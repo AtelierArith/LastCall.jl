@@ -392,6 +392,42 @@ end
         @test occursin("Base.setproperty!", code)
     end
 
+    @testset "_emit_struct_code finalizer is exception-safe" begin
+        struct_info = RustCall.RustStructInfo(
+            "SafeStruct",
+            String[],
+            RustCall.RustMethod[],
+            "",
+            [("val", "i32")],
+            true,
+            Dict{String, Bool}()
+        )
+
+        code = RustCall._emit_struct_code(struct_info)
+        # Finalizer body must be wrapped in try-catch to prevent GC crash (#93)
+        @test occursin("try", code)
+        @test occursin("catch", code)
+        @test occursin("Failed to free SafeStruct", code)
+    end
+
+    @testset "_generate_crate_struct_wrapper finalizer is exception-safe" begin
+        struct_info = RustCall.RustStructInfo(
+            "SafeWrapper",
+            String[],
+            RustCall.RustMethod[],
+            "",
+            [("val", "i32")],
+            true,
+            Dict{String, Bool}()
+        )
+
+        exprs = RustCall._generate_crate_struct_wrapper(struct_info)
+        # Convert the generated Expr to string to verify try-catch is present
+        code_str = sprint(show, exprs)
+        @test occursin("try", code_str)
+        @test occursin("catch", code_str)
+    end
+
     @testset "write_bindings_to_file" begin
         # Test writing bindings to a file
         output_dir = mktempdir()
