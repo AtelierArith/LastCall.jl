@@ -239,8 +239,8 @@ function _compile_and_load_rust(code::String, source_file::String, source_line::
     cache_key = generate_cache_key(wrapped_code, compiler)
 
     # Generate a unique library name based on a deterministic code hash
-    # Use SHA256 instead of hash() which is randomized per Julia session
-    code_hash = bytes2hex(sha256(wrapped_code))[1:16]
+    # Use stable_content_hash() — never hash() for persistent identifiers
+    code_hash = stable_content_hash(wrapped_code)[1:16]
     lib_name = "rust_$(code_hash)"
 
     # Check if already compiled and loaded in memory
@@ -306,7 +306,7 @@ function _compile_and_load_rust(code::String, source_file::String, source_line::
 
         metadata = CacheMetadata(
             cache_key,
-            bytes2hex(sha256(wrapped_code)),
+            stable_content_hash(wrapped_code),
             "$(compiler.optimization_level)_$(compiler.emit_debug_info)",
             compiler.target_triple,
             now(),
@@ -408,8 +408,8 @@ function _compile_and_load_rust_with_cargo(code::String, source_file::String, so
     end
 
     # Generate hashes for caching based on the code to be compiled
-    # Use SHA256 instead of hash() which is randomized per Julia session
-    code_hash = bytes2hex(sha256(augmented_code))
+    # Use stable_content_hash() — never hash() for persistent identifiers
+    code_hash = stable_content_hash(augmented_code)
     deps_hash = hash_dependencies(dependencies)
 
     # Project and library names

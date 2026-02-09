@@ -1,5 +1,15 @@
 # Compilation caching for RustCall.jl
 # Phase 2: Persistent cache system
+#
+# IMPORTANT — Hashing rule for persistent keys
+# =============================================
+# Julia's built-in `hash()` is randomized per session (hash flooding protection).
+# NEVER use `hash()` for values that are persisted to disk or must be stable across
+# Julia processes (cache keys, library names, file names).
+#
+# Use `stable_content_hash()` (defined below) for all persistent identifiers.
+# In-memory-only Dict keys (e.g., RUST_MODULE_REGISTRY, IRUST_FUNCTIONS) may
+# still use `hash()` since they are never written to disk.
 
 using SHA
 using Dates
@@ -12,6 +22,31 @@ Prevents corruption when multiple tasks/threads save or load cached
 artifacts simultaneously.
 """
 const CACHE_LOCK = ReentrantLock()
+
+"""
+    stable_content_hash(data::String) -> String
+
+Compute a deterministic, session-stable hex digest of `data` using SHA-256.
+
+This function MUST be used instead of Julia's `hash()` whenever the result is
+persisted to disk or must be reproducible across Julia processes.  Julia's
+built-in `hash()` is intentionally randomized per session for hash-flooding
+protection and therefore unsuitable for persistent cache keys, library names,
+or file names.
+
+# Returns
+- A 64-character lowercase hex string (SHA-256 digest).
+
+# Examples
+```julia
+h = stable_content_hash("fn add(a: i32, b: i32) -> i32 { a + b }")
+@assert length(h) == 64
+@assert h == stable_content_hash("fn add(a: i32, b: i32) -> i32 { a + b }")
+```
+"""
+function stable_content_hash(data::String)::String
+    return bytes2hex(sha256(data))
+end
 
 """
     CacheMetadata
@@ -58,15 +93,9 @@ Generate a cache key based on code hash, compiler settings, and target triple.
 Uses SHA256 for collision resistance.
 """
 function generate_cache_key(code::String, compiler::RustCompiler)
-    # Create a unique key from code and compiler settings
-    # Use SHA256 directly on the code string for session-stable hashing
-    # (Julia's hash() is randomized per session and unsuitable for persistent caching)
     config_str = "$(compiler.optimization_level)_$(compiler.emit_debug_info)_$(compiler.target_triple)"
     key_data = "$(code)\n---\n$(config_str)"
-
-    # Use SHA256 for a deterministic, session-stable key
-    hash_bytes = sha256(key_data)
-    return bytes2hex(hash_bytes)
+    return stable_content_hash(key_data)
 end
 
 """
