@@ -4,6 +4,21 @@
 using RustToolChain: cargo
 
 """
+    escape_toml_string(s::AbstractString) -> String
+
+Escape special characters in a string for safe TOML value interpolation.
+Prevents TOML injection by escaping backslashes, quotes, and control characters.
+"""
+function escape_toml_string(s::AbstractString)::String
+    s = replace(s, '\\' => "\\\\")
+    s = replace(s, '"' => "\\\"")
+    s = replace(s, '\n' => "\\n")
+    s = replace(s, '\r' => "\\r")
+    s = replace(s, '\t' => "\\t")
+    return s
+end
+
+"""
     CargoProject
 
 Represents a temporary Cargo project for building Rust code with dependencies.
@@ -87,11 +102,11 @@ Generate Cargo.toml content for a project.
 function generate_cargo_toml(name::String, deps::Vector{DependencySpec}, edition::String)
     lines = String[]
 
-    # Package section
+    # Package section (escape user-provided strings to prevent TOML injection)
     push!(lines, "[package]")
-    push!(lines, "name = \"$name\"")
+    push!(lines, "name = \"$(escape_toml_string(name))\"")
     push!(lines, "version = \"0.1.0\"")
-    push!(lines, "edition = \"$edition\"")
+    push!(lines, "edition = \"$(escape_toml_string(edition))\"")
     push!(lines, "")
 
     # Library section - build as cdylib for FFI
@@ -130,37 +145,37 @@ format_dependency_line(DependencySpec("serde", version="1.0", features=["derive"
 ```
 """
 function format_dependency_line(dep::DependencySpec)
-    name = dep.name
+    name = escape_toml_string(dep.name)
 
     # Git dependency
     if !isnothing(dep.git)
         if !isempty(dep.features)
-            features_str = join(["\"$f\"" for f in dep.features], ", ")
-            return "$name = { git = \"$(dep.git)\", features = [$features_str] }"
+            features_str = join(["\"$(escape_toml_string(f))\"" for f in dep.features], ", ")
+            return "$name = { git = \"$(escape_toml_string(dep.git))\", features = [$features_str] }"
         else
-            return "$name = { git = \"$(dep.git)\" }"
+            return "$name = { git = \"$(escape_toml_string(dep.git))\" }"
         end
     end
 
     # Path dependency
     if !isnothing(dep.path)
         if !isempty(dep.features)
-            features_str = join(["\"$f\"" for f in dep.features], ", ")
-            return "$name = { path = \"$(dep.path)\", features = [$features_str] }"
+            features_str = join(["\"$(escape_toml_string(f))\"" for f in dep.features], ", ")
+            return "$name = { path = \"$(escape_toml_string(dep.path))\", features = [$features_str] }"
         else
-            return "$name = { path = \"$(dep.path)\" }"
+            return "$name = { path = \"$(escape_toml_string(dep.path))\" }"
         end
     end
 
     # Version dependency with features
     if !isempty(dep.features)
-        features_str = join(["\"$f\"" for f in dep.features], ", ")
-        return "$name = { version = \"$(dep.version)\", features = [$features_str] }"
+        features_str = join(["\"$(escape_toml_string(f))\"" for f in dep.features], ", ")
+        return "$name = { version = \"$(escape_toml_string(dep.version))\", features = [$features_str] }"
     end
 
     # Simple version dependency
     if !isnothing(dep.version)
-        return "$name = \"$(dep.version)\""
+        return "$name = \"$(escape_toml_string(dep.version))\""
     end
 
     # No version specified (use latest)

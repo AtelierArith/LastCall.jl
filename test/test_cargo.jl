@@ -30,6 +30,28 @@ using Test
         @test occursin("features", cargo_toml)
     end
 
+    @testset "escape_toml_string" begin
+        # No escaping needed
+        @test RustCall.escape_toml_string("hello") == "hello"
+        @test RustCall.escape_toml_string("1.0.0") == "1.0.0"
+
+        # Escape quotes
+        @test RustCall.escape_toml_string("say \"hi\"") == "say \\\"hi\\\""
+
+        # Escape backslashes
+        @test RustCall.escape_toml_string("C:\\path") == "C:\\\\path"
+
+        # Escape control characters
+        @test RustCall.escape_toml_string("line1\nline2") == "line1\\nline2"
+        @test RustCall.escape_toml_string("col1\tcol2") == "col1\\tcol2"
+
+        # TOML injection attempt — should be safely escaped
+        malicious = "1.0\"]\nother_dep = \"1.0"
+        escaped = RustCall.escape_toml_string(malicious)
+        @test !occursin('\n', escaped)
+        @test !occursin("]\n", escaped)
+    end
+
     @testset "format_dependency_line" begin
         # Simple version
         dep1 = DependencySpec("ndarray", version="0.15")
