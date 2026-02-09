@@ -6,8 +6,8 @@ using Libdl
 # Registry for Rust helper library
 const RUST_HELPERS_LIB = Ref{Union{Ptr{Cvoid}, Nothing}}(nothing)
 
-# Flag to track if we've already warned about missing library
-const DROP_WARNING_SHOWN = Ref{Bool}(false)
+# Counter for leaked objects when helpers library is not available
+const LEAKED_OBJECT_COUNT = Ref{Int}(0)
 
 """
     get_rust_helpers_lib() -> Union{Ptr{Cvoid}, Nothing}
@@ -27,6 +27,17 @@ Check if the Rust helpers library is available.
 """
 function is_rust_helpers_available()
     return RUST_HELPERS_LIB[] !== nothing
+end
+
+"""
+    get_leaked_object_count() -> Int
+
+Return the number of Rust ownership objects (RustBox, RustRc, RustArc, RustVec)
+that were dropped without actually freeing Rust memory because the helpers
+library was not available. A non-zero value indicates a memory leak.
+"""
+function get_leaked_object_count()
+    return LEAKED_OBJECT_COUNT[]
 end
 
 """
@@ -160,7 +171,6 @@ function try_load_rust_helpers()
         end
 
         RUST_HELPERS_LIB[] = lib_handle
-        DROP_WARNING_SHOWN[] = false  # Reset warning flag when library is loaded
         return true
     catch e
         @debug "Failed to load Rust helpers library from $lib_path: $e"
@@ -227,11 +237,8 @@ function drop_rust_box(box::RustBox{T}) where T
 
     lib = get_rust_helpers_lib()
     if lib === nothing
-        # Only warn once per session to avoid spam
-        if !DROP_WARNING_SHOWN[] && !haskey(ENV, "RUSTCALL_SUPPRESS_DROP_WARNING")
-            @warn "Rust helpers library not loaded. Ownership types (Box, Rc, Arc) will not work properly. Build with: using Pkg; Pkg.build(\"RustCall\")"
-            DROP_WARNING_SHOWN[] = true
-        end
+        LEAKED_OBJECT_COUNT[] += 1
+        @warn "Memory leak: RustBox{$T} at $(box.ptr) not freed — Rust helpers library not loaded. Build with: using Pkg; Pkg.build(\"RustCall\") [leaked $(LEAKED_OBJECT_COUNT[]) object(s) total]" maxlog=10
         box.dropped = true
         return nothing
     end
@@ -344,11 +351,8 @@ function drop_rust_rc(rc::RustRc{T}) where T
 
     lib = get_rust_helpers_lib()
     if lib === nothing
-        # Only warn once per session to avoid spam
-        if !DROP_WARNING_SHOWN[] && !haskey(ENV, "RUSTCALL_SUPPRESS_DROP_WARNING")
-            @warn "Rust helpers library not loaded. Ownership types (Box, Rc, Arc) will not work properly. Build with: using Pkg; Pkg.build(\"RustCall\")"
-            DROP_WARNING_SHOWN[] = true
-        end
+        LEAKED_OBJECT_COUNT[] += 1
+        @warn "Memory leak: RustRc{$T} at $(rc.ptr) not freed — Rust helpers library not loaded. Build with: using Pkg; Pkg.build(\"RustCall\") [leaked $(LEAKED_OBJECT_COUNT[]) object(s) total]" maxlog=10
         rc.dropped = true
         return nothing
     end
@@ -457,11 +461,8 @@ function drop_rust_arc(arc::RustArc{T}) where T
 
     lib = get_rust_helpers_lib()
     if lib === nothing
-        # Only warn once per session to avoid spam
-        if !DROP_WARNING_SHOWN[] && !haskey(ENV, "RUSTCALL_SUPPRESS_DROP_WARNING")
-            @warn "Rust helpers library not loaded. Ownership types (Box, Rc, Arc) will not work properly. Build with: using Pkg; Pkg.build(\"RustCall\")"
-            DROP_WARNING_SHOWN[] = true
-        end
+        LEAKED_OBJECT_COUNT[] += 1
+        @warn "Memory leak: RustArc{$T} at $(arc.ptr) not freed — Rust helpers library not loaded. Build with: using Pkg; Pkg.build(\"RustCall\") [leaked $(LEAKED_OBJECT_COUNT[]) object(s) total]" maxlog=10
         arc.dropped = true
         return nothing
     end
@@ -529,11 +530,8 @@ function drop_rust_vec(vec::RustVec{T}) where {T}
 
     lib = get_rust_helpers_lib()
     if lib === nothing
-        # Only warn once per session to avoid spam
-        if !DROP_WARNING_SHOWN[] && !haskey(ENV, "RUSTCALL_SUPPRESS_DROP_WARNING")
-            @warn "Rust helpers library not loaded. Cannot properly drop RustVec. Build with: using Pkg; Pkg.build(\"RustCall\")"
-            DROP_WARNING_SHOWN[] = true
-        end
+        LEAKED_OBJECT_COUNT[] += 1
+        @warn "Memory leak: RustVec{$T} at $(vec.ptr) not freed — Rust helpers library not loaded. Build with: using Pkg; Pkg.build(\"RustCall\") [leaked $(LEAKED_OBJECT_COUNT[]) object(s) total]" maxlog=10
         vec.dropped = true
         return nothing
     end

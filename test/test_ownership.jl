@@ -415,4 +415,12 @@ using Test
         @test !isdefined(RustCall, :update_rc_finalizer)
         @test !isdefined(RustCall, :update_arc_finalizer)
     end
+
+    @testset "Leak counter API" begin
+        # get_leaked_object_count should be defined and return an Int
+        @test isdefined(RustCall, :get_leaked_object_count)
+        count = RustCall.get_leaked_object_count()
+        @test count isa Int
+        @test count >= 0
+    end
 end
