@@ -161,42 +161,33 @@ juliatype_to_rust(String)  # => "*const u8" (for FFI)
 juliatype_to_rust(Cstring) # => "*const u8"
 ```
 """
-function juliatype_to_rust(julia_type::Type)
-    # Handle string types
-    if julia_type == String
-        return "*const u8"  # String is passed as *const u8 in FFI
-    elseif julia_type == Cstring
+juliatype_to_rust(::Type{String}) = "*const u8"  # String is passed as *const u8 in FFI
+juliatype_to_rust(::Type{RustString}) = "String"
+juliatype_to_rust(::Type{RustStr}) = "&str"  # RustStr represents Rust's &str
+juliatype_to_rust(::Type{Int}) = Sys.WORD_SIZE == 64 ? "i64" : "i32"
+juliatype_to_rust(::Type{UInt}) = Sys.WORD_SIZE == 64 ? "u64" : "u32"
+
+function juliatype_to_rust(julia_type::Type{<:Ptr})
+    # Cstring is an alias of Ptr{UInt8} and is conventionally treated as const.
+    if julia_type == Cstring
         return "*const u8"
-    elseif julia_type == RustString
-        return "String"
-    elseif julia_type == RustStr
-        return "&str"  # RustStr represents Rust's &str (fat pointer: ptr + len)
     end
 
-    # Handle pointer types
-    if julia_type <: Ptr
-        inner_type = eltype(julia_type)
-        if inner_type == Cvoid
-            return "*mut c_void"
-        elseif inner_type == UInt8
-            return "*mut u8"
-        end
-        inner_rust_type = juliatype_to_rust(inner_type)
-        return "*mut $inner_rust_type"
+    inner_type = eltype(julia_type)
+    if inner_type == Cvoid
+        return "*mut c_void"
+    elseif inner_type == UInt8
+        return "*mut u8"
     end
 
-    # Handle direct mappings
+    inner_rust_type = juliatype_to_rust(inner_type)
+    return "*mut $inner_rust_type"
+end
+
+function juliatype_to_rust(julia_type::Type)
     if haskey(JULIA_TO_RUST_TYPE_MAP, julia_type)
         return JULIA_TO_RUST_TYPE_MAP[julia_type]
     end
-
-    # Handle platform-dependent types
-    if julia_type == Int
-        return Sys.WORD_SIZE == 64 ? "i64" : "i32"
-    elseif julia_type == UInt
-        return Sys.WORD_SIZE == 64 ? "u64" : "u32"
-    end
-
     error("Unsupported Julia type: $julia_type")
 end
 
@@ -248,28 +239,17 @@ end
 
 Convert a Julia type to the corresponding LLVM IR type string.
 """
-function julia_to_llvm_type(julia_type::Type)
-    if julia_type == Bool
-        return "i1"
-    elseif julia_type == Int8 || julia_type == UInt8
-        return "i8"
-    elseif julia_type == Int16 || julia_type == UInt16
-        return "i16"
-    elseif julia_type == Int32 || julia_type == UInt32
-        return "i32"
-    elseif julia_type == Int64 || julia_type == UInt64
-        return "i64"
-    elseif julia_type == Int128 || julia_type == UInt128
-        return "i128"
-    elseif julia_type == Float32
-        return "float"
-    elseif julia_type == Float64
-        return "double"
-    elseif julia_type == Cvoid || julia_type == Nothing
-        return "void"
-    elseif julia_type <: Ptr
-        return "ptr"
-    end
+julia_to_llvm_type(::Type{Bool}) = "i1"
+julia_to_llvm_type(::Type{<:Union{Int8, UInt8}}) = "i8"
+julia_to_llvm_type(::Type{<:Union{Int16, UInt16}}) = "i16"
+julia_to_llvm_type(::Type{<:Union{Int32, UInt32}}) = "i32"
+julia_to_llvm_type(::Type{<:Union{Int64, UInt64}}) = "i64"
+julia_to_llvm_type(::Type{<:Union{Int128, UInt128}}) = "i128"
+julia_to_llvm_type(::Type{Float32}) = "float"
+julia_to_llvm_type(::Type{Float64}) = "double"
+julia_to_llvm_type(::Type{Cvoid}) = "void"  # Cvoid === Nothing
+julia_to_llvm_type(::Type{<:Ptr}) = "ptr"
 
+function julia_to_llvm_type(julia_type::Type)
     error("Unsupported Julia type for LLVM: $julia_type")
 end
