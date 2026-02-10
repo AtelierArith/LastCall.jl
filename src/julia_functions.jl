@@ -435,12 +435,21 @@ function _rust_type_to_julia_conversion_type(rust_type::String)
 end
 
 """
-    _rust_type_to_julia_type_symbol(rust_type::String) -> Union{Symbol, Nothing}
+    _rust_type_to_julia_type_symbol(rust_type::AbstractString) -> Union{Symbol, Expr, Nothing}
 
 Get the Julia type symbol for return type annotation.
 """
-function _rust_type_to_julia_type_symbol(rust_type::String)
-    rust_type = strip(rust_type)
+function _rust_type_to_julia_type_symbol(rust_type::AbstractString)
+    rust_type = strip(String(rust_type))
+
+    # Pointer types: *const T / *mut T
+    ptr_match = match(r"^\*(?:const|mut)\s+(.+)$", rust_type)
+    if ptr_match !== nothing
+        inner_rust = strip(ptr_match.captures[1])
+        inner_julia = _rust_type_to_julia_type_symbol(inner_rust)
+        inner_julia = inner_julia === nothing ? :Cvoid : inner_julia
+        return :(Ptr{$inner_julia})
+    end
 
     type_map = Dict(
         "i8" => :Int8,

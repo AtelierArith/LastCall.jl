@@ -415,6 +415,20 @@ function create_wrapper_crate(info::CrateInfo, opts::CrateBindingOptions)
 end
 
 """
+    _persist_library_artifact(lib_path::String; prefix::String = "rustcall_lib_") -> String
+
+Copy a compiled shared library to a stable temporary location and return the new path.
+This is used for wrapper-crate builds whose project directory is cleaned up after build.
+"""
+function _persist_library_artifact(lib_path::String; prefix::String = "rustcall_lib_")
+    isfile(lib_path) || error("Library artifact not found: $lib_path")
+    out_dir = mktempdir(prefix=prefix)
+    dest = joinpath(out_dir, basename(lib_path))
+    cp(lib_path, dest, force=true)
+    return dest
+end
+
+"""
     generate_wrapper_cargo_toml(info::CrateInfo, opts::CrateBindingOptions) -> String
 
 Generate Cargo.toml content for the wrapper crate.
@@ -1044,7 +1058,10 @@ function generate_bindings(crate_path::String;
             )
 
             try
-                lib_path = build_cargo_project(wrapper_project, release=build_release)
+                built_lib_path = build_cargo_project(wrapper_project, release=build_release)
+                # Wrapper project directories are temporary and cleaned up; persist
+                # the built dylib/so/dll before cleanup so generated bindings remain loadable.
+                lib_path = _persist_library_artifact(built_lib_path, prefix="rustcall_wrapper_lib_")
             finally
                 cleanup_cargo_project(wrapper_project)
             end
@@ -1287,7 +1304,9 @@ function write_bindings_to_file(crate_path::String, output_path::String;
         )
 
         try
-            build_cargo_project(wrapper_project, release=build_release)
+            built_lib_path = build_cargo_project(wrapper_project, release=build_release)
+            # Wrapper crate output is deleted during cleanup; persist artifact first.
+            _persist_library_artifact(built_lib_path, prefix="rustcall_wrapper_lib_")
         finally
             cleanup_cargo_project(wrapper_project)
         end
