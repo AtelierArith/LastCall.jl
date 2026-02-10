@@ -113,50 +113,47 @@ end
 Convert an LLVM type to the corresponding Julia type.
 Uses LLVM.jl 9.x API which uses concrete types for different LLVM types.
 """
-function llvm_type_to_julia(llvm_type::LLVM.LLVMType)
-    # Check type using isa (LLVM.jl 9.x uses concrete types)
-    if llvm_type isa LLVM.VoidType
-        return Cvoid
-    elseif llvm_type isa LLVM.IntegerType
-        width = LLVM.width(llvm_type)
-        if width == 1
-            return Bool
-        elseif width == 8
-            return Int8
-        elseif width == 16
-            return Int16
-        elseif width == 32
-            return Int32
-        elseif width == 64
-            return Int64
-        elseif width == 128
-            return Int128
-        else
-            error("Unsupported integer width: $width")
-        end
-    elseif llvm_type isa LLVM.LLVMFloat
-        return Float32
-    elseif llvm_type isa LLVM.LLVMDouble
-        return Float64
-    elseif llvm_type isa LLVM.PointerType
-        # Try to preserve inner type information when available (#182)
-        inner_type = try
-            eltype = LLVM.eltype(llvm_type)
-            llvm_type_to_julia(eltype)
-        catch
-            Cvoid
-        end
-        return Ptr{inner_type}
-    elseif llvm_type isa LLVM.StructType
-        # For structs, return a generic pointer for now
-        return Ptr{Cvoid}
-    elseif llvm_type isa LLVM.ArrayType
-        return Ptr{Cvoid}
+llvm_type_to_julia(::LLVM.VoidType) = Cvoid
+llvm_type_to_julia(::LLVM.LLVMFloat) = Float32
+llvm_type_to_julia(::LLVM.LLVMDouble) = Float64
+
+function llvm_type_to_julia(llvm_type::LLVM.IntegerType)
+    width = LLVM.width(llvm_type)
+    if width == 1
+        return Bool
+    elseif width == 8
+        return Int8
+    elseif width == 16
+        return Int16
+    elseif width == 32
+        return Int32
+    elseif width == 64
+        return Int64
+    elseif width == 128
+        return Int128
     else
-        # Fallback: try to determine from type name
-        type_str = string(typeof(llvm_type))
-        error("Unsupported LLVM type: $type_str")
+        error("Unsupported integer width: $width")
     end
+end
+
+function llvm_type_to_julia(llvm_type::LLVM.PointerType)
+    # Try to preserve inner type information when available (#182)
+    inner_type = try
+        eltype = LLVM.eltype(llvm_type)
+        llvm_type_to_julia(eltype)
+    catch
+        Cvoid
+    end
+    return Ptr{inner_type}
+end
+
+# For structs/arrays, return generic pointers for now.
+llvm_type_to_julia(::LLVM.StructType) = Ptr{Cvoid}
+llvm_type_to_julia(::LLVM.ArrayType) = Ptr{Cvoid}
+
+function llvm_type_to_julia(llvm_type::LLVM.LLVMType)
+    type_str = string(typeof(llvm_type))
+    error("Unsupported LLVM type: $type_str")
 end
 
 """
@@ -165,41 +162,33 @@ end
 Convert a Julia type to the corresponding LLVM type.
 Note: Must be called within an active LLVM context (use LLVM.Context() do ... end).
 """
-function julia_type_to_llvm(julia_type::Type)
-    if julia_type == Cvoid || julia_type == Nothing
-        return LLVM.VoidType()
-    elseif julia_type == Bool
-        return LLVM.IntType(1)
-    elseif julia_type == Int8 || julia_type == UInt8
-        return LLVM.IntType(8)
-    elseif julia_type == Int16 || julia_type == UInt16
-        return LLVM.IntType(16)
-    elseif julia_type == Int32 || julia_type == UInt32
-        return LLVM.IntType(32)
-    elseif julia_type == Int64 || julia_type == UInt64
-        return LLVM.IntType(64)
-    elseif julia_type == Int128 || julia_type == UInt128
-        return LLVM.IntType(128)
-    elseif julia_type == Float32
-        return LLVM.FloatType()
-    elseif julia_type == Float64
-        return LLVM.DoubleType()
-    elseif julia_type <: Ptr
-        # Preserve inner type information when possible (#182)
-        inner = eltype(julia_type)
-        if inner == Cvoid || inner == Nothing
-            return LLVM.PointerType(LLVM.IntType(8))
-        else
-            inner_llvm = try
-                julia_type_to_llvm(inner)
-            catch
-                LLVM.IntType(8)
-            end
-            return LLVM.PointerType(inner_llvm)
-        end
+julia_type_to_llvm(::Type{Cvoid}) = LLVM.VoidType()  # Cvoid === Nothing
+julia_type_to_llvm(::Type{Bool}) = LLVM.IntType(1)
+julia_type_to_llvm(::Type{<:Union{Int8, UInt8}}) = LLVM.IntType(8)
+julia_type_to_llvm(::Type{<:Union{Int16, UInt16}}) = LLVM.IntType(16)
+julia_type_to_llvm(::Type{<:Union{Int32, UInt32}}) = LLVM.IntType(32)
+julia_type_to_llvm(::Type{<:Union{Int64, UInt64}}) = LLVM.IntType(64)
+julia_type_to_llvm(::Type{<:Union{Int128, UInt128}}) = LLVM.IntType(128)
+julia_type_to_llvm(::Type{Float32}) = LLVM.FloatType()
+julia_type_to_llvm(::Type{Float64}) = LLVM.DoubleType()
+
+function julia_type_to_llvm(julia_type::Type{<:Ptr})
+    # Preserve inner type information when possible (#182)
+    inner = eltype(julia_type)
+    if inner == Cvoid
+        return LLVM.PointerType(LLVM.IntType(8))
     else
-        error("Unsupported Julia type for LLVM: $julia_type")
+        inner_llvm = try
+            julia_type_to_llvm(inner)
+        catch
+            LLVM.IntType(8)
+        end
+        return LLVM.PointerType(inner_llvm)
     end
+end
+
+function julia_type_to_llvm(julia_type::Type)
+    error("Unsupported Julia type for LLVM: $julia_type")
 end
 
 # Keep the old signature for backward compatibility (ignore ctx)
