@@ -189,7 +189,7 @@ When Rust functions expect `*const u8` (C strings), you can pass Julia `String` 
 rust"""
 #[no_mangle]
 pub extern "C" fn string_length(s: *const u8) -> u32 {
-    let c_str = unsafe { std::ffi::CStr::from_ptr(s as *const i8) };
+    let c_str = unsafe { std::ffi::CStr::from_ptr(s) };
     c_str.to_bytes().len() as u32
 }
 """
@@ -205,7 +205,7 @@ len = @rust string_length("世界")::UInt32   # => 6 (UTF-8 bytes)
 rust"""
 #[no_mangle]
 pub extern "C" fn count_chars(s: *const u8) -> u32 {
-    let c_str = unsafe { std::ffi::CStr::from_ptr(s as *const i8) };
+    let c_str = unsafe { std::ffi::CStr::from_ptr(s) };
     let utf8_str = std::str::from_utf8(c_str.to_bytes()).unwrap();
     utf8_str.chars().count() as u32
 }

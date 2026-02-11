@@ -234,7 +234,7 @@ invalid UTF-8 sequence
 
 1. Handle UTF-8 strings correctly:
    ```rust
-   let c_str = unsafe { std::ffi::CStr::from_ptr(s as *const i8) };
+   let c_str = unsafe { std::ffi::CStr::from_ptr(s) };
    let utf8_str = std::str::from_utf8(c_str.to_bytes())
        .unwrap_or("");  // Error handling
    ```

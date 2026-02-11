@@ -107,12 +107,12 @@ rust"""
 #[no_mangle]
 pub extern "C" fn find_substring(haystack: *const u8, needle: *const u8) -> i32 {
     let haystack_str = unsafe {
-        std::ffi::CStr::from_ptr(haystack as *const i8)
+        std::ffi::CStr::from_ptr(haystack)
             .to_str()
             .unwrap_or("")
     };
     let needle_str = unsafe {
-        std::ffi::CStr::from_ptr(needle as *const i8)
+        std::ffi::CStr::from_ptr(needle)
             .to_str()
             .unwrap_or("")
     };
@@ -136,7 +136,7 @@ rust"""
 #[no_mangle]
 pub extern "C" fn count_words(text: *const u8) -> u32 {
     let text_str = unsafe {
-        std::ffi::CStr::from_ptr(text as *const i8)
+        std::ffi::CStr::from_ptr(text)
             .to_str()
             .unwrap_or("")
     };
@@ -155,14 +155,14 @@ word_count = @rust count_words("The quick brown fox")::UInt32  # => 4
 rust"""
 #[no_mangle]
 pub extern "C" fn count_utf8_chars(s: *const u8) -> u32 {
-    let c_str = unsafe { std::ffi::CStr::from_ptr(s as *const i8) };
+    let c_str = unsafe { std::ffi::CStr::from_ptr(s) };
     let utf8_str = std::str::from_utf8(c_str.to_bytes()).unwrap_or("");
     utf8_str.chars().count() as u32
 }
 
 #[no_mangle]
 pub extern "C" fn reverse_utf8_string(s: *const u8, output: *mut u8, len: usize) {
-    let c_str = unsafe { std::ffi::CStr::from_ptr(s as *const i8) };
+    let c_str = unsafe { std::ffi::CStr::from_ptr(s) };
     let utf8_str = std::str::from_utf8(c_str.to_bytes()).unwrap_or("");
     let reversed: String = utf8_str.chars().rev().collect();
 
@@ -279,7 +279,7 @@ rust"""
 #[no_mangle]
 pub extern "C" fn rust_count_words(text: *const u8) -> u32 {
     let text_str = unsafe {
-        std::ffi::CStr::from_ptr(text as *const i8)
+        std::ffi::CStr::from_ptr(text)
             .to_str()
             .unwrap_or("")
     };
@@ -475,7 +475,7 @@ rust"""
 #[no_mangle]
 pub extern "C" fn validate_ip_address(ip: *const u8) -> bool {
     let ip_str = unsafe {
-        std::ffi::CStr::from_ptr(ip as *const i8)
+        std::ffi::CStr::from_ptr(ip)
             .to_str()
             .unwrap_or("")
     };

@@ -327,7 +327,7 @@ using RustCall
 rust"""
 #[no_mangle]
 pub extern "C" fn string_length(s: *const u8) -> u32 {
-    let c_str = unsafe { std::ffi::CStr::from_ptr(s as *const i8) };
+    let c_str = unsafe { std::ffi::CStr::from_ptr(s) };
     c_str.to_bytes().len() as u32
 }
 """

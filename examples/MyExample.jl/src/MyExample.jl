@@ -86,7 +86,7 @@ rust"""
 #[julia]
 fn count_words(text: *const u8) -> u32 {
     let text_str = unsafe {
-        std::ffi::CStr::from_ptr(text as *const i8)
+        std::ffi::CStr::from_ptr(text)
             .to_str()
             .unwrap_or("")
     };
@@ -96,7 +96,7 @@ fn count_words(text: *const u8) -> u32 {
 #[julia]
 fn reverse_string(input: *const u8, output: *mut u8, len: usize) {
     let input_str = unsafe {
-        std::ffi::CStr::from_ptr(input as *const i8)
+        std::ffi::CStr::from_ptr(input)
             .to_str()
             .unwrap_or("")
     };
