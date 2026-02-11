@@ -2,6 +2,7 @@
 # This module provides automatic detection and rebuild when Rust source files change.
 
 using FileWatching
+using RustToolChain: cargo
 
 # ============================================================================
 # Hot Reload State
@@ -155,19 +156,25 @@ function _refresh_crate_binding_module!(mod::Module)
         return nothing
     end
 
-    lib_ref = getfield(mod, :_LIB_HANDLE)
-    handle = lib_ref[]
-    if handle != C_NULL
-        try
-            Libdl.dlclose(handle)
-        catch e
-            @debug "Failed to close old crate binding handle during refresh" exception=e
+    # Use invokelatest to access module bindings defined in a newer world age
+    # (Julia 1.12 enforces stricter world-age semantics for global bindings).
+    Base.invokelatest() do
+        lib_ref = getfield(mod, :_LIB_HANDLE)
+        handle = lib_ref[]
+        if handle != C_NULL
+            try
+                Libdl.dlclose(handle)
+            catch e
+                @debug "Failed to close old crate binding handle during refresh" exception=e
+            end
         end
+        lib_ref[] = C_NULL
     end
-    lib_ref[] = C_NULL
 
     if isdefined(mod, :__init__)
-        Base.invokelatest(getfield(mod, :__init__))
+        Base.invokelatest() do
+            getfield(mod, :__init__)()
+        end
     end
 
     return nothing
@@ -295,8 +302,10 @@ function rebuild_crate(crate_path::String)
         error("Crate must have crate-type = [\"cdylib\"] for hot reload")
     end
 
-    # Build in release mode
-    cmd = `cargo build --release --manifest-path $cargo_toml_path`
+    # Build in release mode (use RustToolChain.cargo() for consistency with
+    # build_cargo_project, ensuring the same cargo binary and environment).
+    cargo_cmd = cargo()
+    cmd = `$cargo_cmd build --release --manifest-path $cargo_toml_path`
     run(cmd)
 
     # Find the compiled library

@@ -280,7 +280,9 @@ end
         macros_abs = joinpath(repo_root, "deps", "juliacall_macros")
         cargo_toml = joinpath(tmp_crate, "Cargo.toml")
         cargo_content = read(cargo_toml, String)
-        cargo_content = replace(cargo_content, "../../deps/juliacall_macros" => macros_abs)
+        # Use forward slashes for TOML path compatibility on all platforms
+        macros_toml_path = replace(macros_abs, "\\" => "/")
+        cargo_content = replace(cargo_content, "../../deps/juliacall_macros" => macros_toml_path)
         write(cargo_toml, cargo_content)
 
         mod_name = "HotReloadRefresh_$(rand(UInt32))"
@@ -295,8 +297,12 @@ end
                 tmp_crate,
                 module_name=mod_name,
                 module_scope=Main,
-                interval=0.1,
+                interval=3600.0,  # Large interval; we use manual trigger_reload below
             )
+
+            # Stop the background watch task to prevent a race between the
+            # automatic watcher and the explicit trigger_reload call below.
+            RustCall.stop_watch_task(state)
 
             lib_rs = joinpath(tmp_crate, "src", "lib.rs")
             code = read(lib_rs, String)
