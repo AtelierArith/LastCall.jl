@@ -61,8 +61,6 @@ function _defer_drop(ptr::Ptr{Cvoid}, type_name::String, drop_symbol::Symbol)
         @warn "Deferred drop queue reached $(MAX_DEFERRED_DROPS[]) entries, attempting flush" maxlog=5
         flush_deferred_drops()
     end
-    @warn "Deferring drop for $type_name at $ptr — Rust helpers library unavailable. " *
-          "Build with: using Pkg; Pkg.build(\"RustCall\")" maxlog=10
 end
 
 """
@@ -80,8 +78,6 @@ function _defer_vec_drop(ptr::Ptr{Cvoid}, len::UInt, cap::UInt, type_name::Strin
         @warn "Deferred drop queue reached $(MAX_DEFERRED_DROPS[]) entries, attempting flush" maxlog=5
         flush_deferred_drops()
     end
-    @warn "Deferring drop for $type_name at $ptr — Rust helpers library unavailable. " *
-          "Build with: using Pkg; Pkg.build(\"RustCall\")" maxlog=10
 end
 
 """
@@ -539,6 +535,8 @@ function drop_rust_box(box::RustBox{T}) where T
         lib = get_rust_helpers_lib()
         if lib === nothing
             _defer_drop(box.ptr, "RustBox{$T}", drop_sym)
+            @warn "Deferring drop for RustBox{$T} at $(box.ptr) — Rust helpers library unavailable. " *
+                  "Build with: using Pkg; Pkg.build(\"RustCall\")" maxlog=10
             box.dropped = true
             return nothing
         end
@@ -628,6 +626,8 @@ function drop_rust_rc(rc::RustRc{T}) where T
         lib = get_rust_helpers_lib()
         if lib === nothing
             _defer_drop(rc.ptr, "RustRc{$T}", drop_sym)
+            @warn "Deferring drop for RustRc{$T} at $(rc.ptr) — Rust helpers library unavailable. " *
+                  "Build with: using Pkg; Pkg.build(\"RustCall\")" maxlog=10
             rc.dropped = true
             return nothing
         end
@@ -717,6 +717,8 @@ function drop_rust_arc(arc::RustArc{T}) where T
         lib = get_rust_helpers_lib()
         if lib === nothing
             _defer_drop(arc.ptr, "RustArc{$T}", drop_sym)
+            @warn "Deferring drop for RustArc{$T} at $(arc.ptr) — Rust helpers library unavailable. " *
+                  "Build with: using Pkg; Pkg.build(\"RustCall\")" maxlog=10
             arc.dropped = true
             return nothing
         end
@@ -790,6 +792,8 @@ function drop_rust_vec(vec::RustVec{T}) where {T}
         lib = get_rust_helpers_lib()
         if lib === nothing
             _defer_vec_drop(vec.ptr, UInt(vec.len), UInt(vec.cap), "RustVec{$T}", drop_sym)
+            @warn "Deferring drop for RustVec{$T} at $(vec.ptr) — Rust helpers library unavailable. " *
+                  "Build with: using Pkg; Pkg.build(\"RustCall\")" maxlog=10
             vec.dropped = true
             return nothing
         end
