@@ -528,11 +528,17 @@ function emit_crate_module(info::CrateInfo, lib_path::String; module_name::Union
         function __init__()
             handle = Libdl.dlopen(_LIB_PATH, Libdl.RTLD_GLOBAL | Libdl.RTLD_NOW)
             _LIB_HANDLE[] = handle
-            RustCall.CRATE_LIB_HANDLES[RustCall._normalize_crate_lib_path(_LIB_PATH)] = handle
+            lib_key = RustCall._normalize_crate_lib_path(_LIB_PATH)
+            lock(RustCall.REGISTRY_LOCK) do
+                RustCall.CRATE_LIB_HANDLES[lib_key] = handle
+            end
         end
 
         function _get_func_ptr(name::String)
-            handle = Base.get(RustCall.CRATE_LIB_HANDLES, RustCall._normalize_crate_lib_path(_LIB_PATH), C_NULL)
+            lib_key = RustCall._normalize_crate_lib_path(_LIB_PATH)
+            handle = lock(RustCall.REGISTRY_LOCK) do
+                Base.get(RustCall.CRATE_LIB_HANDLES, lib_key, C_NULL)
+            end
             if handle == C_NULL
                 handle = _LIB_HANDLE[]
             end
@@ -1405,13 +1411,19 @@ function emit_crate_module_code(info::CrateInfo, lib_path::String;
     push!(lines, "function __init__()")
     push!(lines, "    handle = Libdl.dlopen(_LIB_PATH, Libdl.RTLD_GLOBAL | Libdl.RTLD_NOW)")
     push!(lines, "    _LIB_HANDLE[] = handle")
-    push!(lines, "    RustCall.CRATE_LIB_HANDLES[RustCall._normalize_crate_lib_path(_LIB_PATH)] = handle")
+    push!(lines, "    lib_key = RustCall._normalize_crate_lib_path(_LIB_PATH)")
+    push!(lines, "    lock(RustCall.REGISTRY_LOCK) do")
+    push!(lines, "        RustCall.CRATE_LIB_HANDLES[lib_key] = handle")
+    push!(lines, "    end")
     push!(lines, "end")
     push!(lines, "")
 
     # Helper function
     push!(lines, "function _get_func_ptr(name::String)")
-    push!(lines, "    handle = Base.get(RustCall.CRATE_LIB_HANDLES, RustCall._normalize_crate_lib_path(_LIB_PATH), C_NULL)")
+    push!(lines, "    lib_key = RustCall._normalize_crate_lib_path(_LIB_PATH)")
+    push!(lines, "    handle = lock(RustCall.REGISTRY_LOCK) do")
+    push!(lines, "        Base.get(RustCall.CRATE_LIB_HANDLES, lib_key, C_NULL)")
+    push!(lines, "    end")
     push!(lines, "    if handle == C_NULL")
     push!(lines, "        handle = _LIB_HANDLE[]")
     push!(lines, "    end")

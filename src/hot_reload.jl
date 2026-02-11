@@ -169,6 +169,21 @@ function _reload_library_locked(state::HotReloadState)
     @info "Hot reload: Rebuilding $(state.lib_name)..."
 
     try
+        # Track handles that were already closed to avoid double dlclose when
+        # RUST_LIBRARIES and CRATE_LIB_HANDLES point to the same library.
+        closed_handles = Set{Ptr{Cvoid}}()
+        close_handle_once!(handle::Ptr{Cvoid}) = begin
+            if handle == C_NULL || (handle in closed_handles)
+                return false
+            end
+            Libdl.dlclose(handle)
+            push!(closed_handles, handle)
+            return true
+        end
+
+        expected_lib_path = _expected_crate_lib_path(state.crate_path)
+        expected_lib_key = expected_lib_path === nothing ? nothing : _normalize_crate_lib_path(expected_lib_path)
+
         # Unload the old library and clear stale monomorphized functions
         # atomically under REGISTRY_LOCK to prevent other threads from
         # observing an inconsistent state between check and unload.
@@ -179,7 +194,7 @@ function _reload_library_locked(state::HotReloadState)
                 if CURRENT_LIB[] == state.lib_name
                     CURRENT_LIB[] = ""
                 end
-                Libdl.dlclose(lib_handle)
+                close_handle_once!(lib_handle)
             end
 
             # Clear stale monomorphized function pointers that belonged to the
@@ -192,19 +207,13 @@ function _reload_library_locked(state::HotReloadState)
             if !isempty(stale_keys)
                 @debug "Hot reload: Cleared $(length(stale_keys)) stale monomorphized functions"
             end
-        end
-
-        # Also close the handle held by the crate binding module (via
-        # CRATE_LIB_HANDLES) so that the OS fully unloads the old library
-        # and a subsequent dlopen on the same path loads the new binary.
-        # Compute the expected lib path before rebuilding.
-        expected_lib_path = _expected_crate_lib_path(state.crate_path)
-        if expected_lib_path !== nothing
-            norm_key = _normalize_crate_lib_path(expected_lib_path)
-            old_handle = get(CRATE_LIB_HANDLES, norm_key, C_NULL)
-            if old_handle != C_NULL
-                Libdl.dlclose(old_handle)
-                CRATE_LIB_HANDLES[norm_key] = C_NULL
+            # Also close the handle held by the crate binding module (via
+            # CRATE_LIB_HANDLES) so that the OS fully unloads the old library
+            # and a subsequent dlopen on the same path loads the new binary.
+            if expected_lib_key !== nothing
+                old_handle = get(CRATE_LIB_HANDLES, expected_lib_key, C_NULL)
+                close_handle_once!(old_handle)
+                CRATE_LIB_HANDLES[expected_lib_key] = C_NULL
             end
         end
 
@@ -223,10 +232,9 @@ function _reload_library_locked(state::HotReloadState)
                 @warn "Hot reload: Library $(state.lib_name) was re-registered during rebuild; overwriting"
             end
             RUST_LIBRARIES[state.lib_name] = (lib_handle, Dict{String, Ptr{Cvoid}}())
+            # Update the shared handle so old module references see the new library.
+            CRATE_LIB_HANDLES[_normalize_crate_lib_path(new_lib_path)] = lib_handle
         end
-
-        # Update the shared handle so old module references see the new library
-        CRATE_LIB_HANDLES[_normalize_crate_lib_path(new_lib_path)] = lib_handle
 
         @info "Hot reload: Successfully reloaded $(state.lib_name)"
 
@@ -519,6 +527,19 @@ function disable_hot_reload(lib_name::String)
     state.enabled = false
 
     @info "Hot reload disabled for $lib_name"
+end
+
+"""
+    clear_hot_reload_registry!()
+
+Clear hot reload registry state under lock.
+Intended for tests and internal cleanup paths.
+"""
+function clear_hot_reload_registry!()
+    lock(REGISTRY_LOCK) do
+        empty!(HOT_RELOAD_REGISTRY)
+    end
+    return nothing
 end
 
 """

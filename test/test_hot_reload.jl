@@ -52,7 +52,7 @@ const SAMPLE_CRATE_PATH = joinpath(dirname(@__DIR__), "examples", "sample_crate"
 
     @testset "Hot reload registry" begin
         # Clear the registry first
-        empty!(RustCall.HOT_RELOAD_REGISTRY)
+        RustCall.clear_hot_reload_registry!()
 
         # Initially no crates should be registered
         @test isempty(RustCall.list_hot_reload_crates())
@@ -89,7 +89,7 @@ const SAMPLE_CRATE_PATH = joinpath(dirname(@__DIR__), "examples", "sample_crate"
 
     @testset "is_hot_reload_enabled" begin
         # Clear registry
-        empty!(RustCall.HOT_RELOAD_REGISTRY)
+        RustCall.clear_hot_reload_registry!()
 
         # Non-registered crate should return false
         @test !RustCall.is_hot_reload_enabled("NonExistentLib")
@@ -170,7 +170,7 @@ end
 
     @testset "Enable and disable hot reload" begin
         # Clear registry
-        empty!(RustCall.HOT_RELOAD_REGISTRY)
+        RustCall.clear_hot_reload_registry!()
 
         try
             # Enable hot reload
@@ -192,13 +192,13 @@ end
             # Clean up
             RustCall.disable_all_hot_reload()
             sleep(0.1)
-            empty!(RustCall.HOT_RELOAD_REGISTRY)
+            RustCall.clear_hot_reload_registry!()
         end
     end
 
     @testset "Check for changes" begin
         # Clear registry
-        empty!(RustCall.HOT_RELOAD_REGISTRY)
+        RustCall.clear_hot_reload_registry!()
 
         try
             state = RustCall.enable_hot_reload("SampleCrateCheck", SAMPLE_CRATE_PATH)
@@ -216,19 +216,23 @@ end
         finally
             RustCall.disable_all_hot_reload()
             sleep(0.1)
-            empty!(RustCall.HOT_RELOAD_REGISTRY)
+            RustCall.clear_hot_reload_registry!()
         end
     end
 
     @testset "Callback support" begin
-        empty!(RustCall.HOT_RELOAD_REGISTRY)
+        RustCall.clear_hot_reload_registry!()
 
         callback_called = Ref(false)
         callback_lib_name = Ref("")
+        callback_success = Ref(false)
+        callback_error = Ref{Any}(nothing)
 
         function my_callback(lib_name, success, error)
             callback_called[] = true
             callback_lib_name[] = lib_name
+            callback_success[] = success
+            callback_error[] = error
         end
 
         try
@@ -241,15 +245,22 @@ end
             @test state.rebuild_callback !== nothing
             @test state.rebuild_callback === my_callback
 
+            ok = RustCall.reload_library(state)
+            @test ok
+            @test callback_called[]
+            @test callback_lib_name[] == "SampleCrateCallback"
+            @test callback_success[]
+            @test callback_error[] === nothing
+
         finally
             RustCall.disable_all_hot_reload()
             sleep(0.1)
-            empty!(RustCall.HOT_RELOAD_REGISTRY)
+            RustCall.clear_hot_reload_registry!()
         end
     end
 
     @testset "enable_hot_reload_for_crate refreshes @rust_crate module" begin
-        empty!(RustCall.HOT_RELOAD_REGISTRY)
+        RustCall.clear_hot_reload_registry!()
         repo_root = normpath(joinpath(@__DIR__, ".."))
         crate_path = mktempdir(prefix="rustcall_hotreload_refresh_")
         try
@@ -276,7 +287,7 @@ end
             # Initial load: generate and eval
             bindings = RustCall.generate_bindings(crate_path; output_module_name=mod_name, cache_enabled=false)
             Core.eval(Main, bindings)
-            Mod = getfield(Main, Symbol(mod_name))
+            Mod = Base.invokelatest(getfield, Main, Symbol(mod_name))
 
             # Enable hot reload with callback that re-evals the module so it dlopens the new .so
             state = RustCall.enable_hot_reload_for_crate(crate_path, callback=(lib_name, ok, err) -> begin
@@ -306,7 +317,7 @@ end
         finally
             RustCall.disable_all_hot_reload()
             sleep(0.1)
-            empty!(RustCall.HOT_RELOAD_REGISTRY)
+            RustCall.clear_hot_reload_registry!()
             try
                 rm(crate_path; recursive=true, force=true)
             catch e
